@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>MA.Streaming.Core</Title>
+    <Company>McLaren Applied</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+	<Description>MA Stream API core libraries.</Description>
+	<Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MA.DataPlatform.Secu4.KafkaMetadataComponent" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouterComponent" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouteReaderComponent" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouteSubscriberComponent" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Shared" Version="1.1.1.210-ci" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="MA.Streaming.IntegrationTests" />
+		<InternalsVisibleTo Include="MA.Streaming.UnitTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+    <ProjectReference Include="..\MA.Streaming.Abstraction\MA.Streaming.Abstraction.csproj" />
+    <ProjectReference Include="..\MA.Streaming.PrometheusMetrics\MA.Streaming.PrometheusMetrics.csproj" />
+  </ItemGroup>
+
+</Project>

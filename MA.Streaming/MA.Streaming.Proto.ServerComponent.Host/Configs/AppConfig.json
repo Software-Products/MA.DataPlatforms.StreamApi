@@ -1,0 +1,20 @@
+{
+  "StreamCreationStrategy": 1,
+  "BrokerUrl": "localhost:9092",
+  "PartitionMappings": [
+    {
+      "Stream": "Stream1",
+      "Partition": 1
+    },
+    {
+      "Stream": "Stream2",
+      "Partition": 2
+    }
+  ],
+  "IntegrateSessionManagement": true,
+  "IntegrateDataFormatManagement": true,
+  "UseRemoteKeyGenerator": true,
+  "RemoteKeyGeneratorServiceAddress": "localhost:15379",
+  "BatchingResponses": true,
+  "StreamApiPort": 13579
+}

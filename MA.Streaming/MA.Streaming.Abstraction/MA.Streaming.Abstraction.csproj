@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>MA.Streaming.Abstraction</Title>
+    <Company>McLaren Applied</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+	<Description>MA Stream API abstractions.</Description>
+	<Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MA.Common" Version="1.1.1.210-ci" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="1.1.1.210-ci" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MA.Streaming.Contracts\MA.Streaming.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

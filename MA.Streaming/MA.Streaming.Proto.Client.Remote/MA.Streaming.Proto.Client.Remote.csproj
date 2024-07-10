@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Company>McLaren Applied</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+	<Description>A .NET implementation of the MA Stream API for client applications that connect to a remote gRPC server. The client requires an external Stream API server to be set up (for example using the MA Streaming Server docker image), running the Stream API services.</Description>
+	<Authors>McLaren Applied</Authors>
+	<Title>MA.Streaming.Proto.Client.Remote</Title>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MA.Streaming.Proto.ServerComponent\MA.Streaming.Proto.ServerComponent.csproj" />
+  </ItemGroup>
+
+</Project>

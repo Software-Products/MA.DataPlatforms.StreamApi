@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Title>MA.Streaming.Proto.Core</Title>
+		<Company>McLaren Applied</Company>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<Description>Core libraries for the MA Stream API.</Description>
+		<Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Google.Protobuf" Version="3.26.1" />
+		<PackageReference Include="Grpc.Net.Common" Version="2.62.0" />
+		<PackageReference Include="Grpc.Tools" Version="2.62.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MA.Streaming.Protocol.OpenData.Proto" Version="1.0.0.14-ci" GeneratePathProperty="true">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <Protobuf Include="$(PkgMA_Streaming_Protocol_OpenData_Proto)/ma/streaming/**/*.proto" GrpcServices="None" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_Protocol_OpenData_Proto)" />  
+  </ItemGroup>
+  
+	<ItemGroup>
+		<PackageReference Include="MA.Streaming.API.Proto" Version="1.0.0.14-ci" GeneratePathProperty="true">
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+    <Protobuf Include="$(PkgMA_Streaming_API_Proto)/ma/streaming/**/*.proto" GrpcServices="Both" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_API_Proto);$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_API_Proto)" />	
+  </ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="MA.Streaming.UnitTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\MA.Streaming.Abstraction\MA.Streaming.Abstraction.csproj" />
+		<ProjectReference Include="..\MA.Streaming.Contracts\MA.Streaming.Contracts.csproj" />
+		<ProjectReference Include="..\MA.Streaming.Core\MA.Streaming.Core.csproj" />
+		<ProjectReference Include="..\MA.Streaming.PrometheusMetrics\MA.Streaming.PrometheusMetrics.csproj" />
+	</ItemGroup>
+
+
+</Project>

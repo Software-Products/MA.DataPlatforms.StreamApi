@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>MA.Streaming.Proto.ServerComponent</Title>
+		<Company>McLaren Applied</Company>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<Description>A .NET implementation of the MA Stream API gRPC server.</Description>
+		<Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Google.Protobuf" Version="3.26.1" />
+		<PackageReference Include="Grpc.AspNetCore" Version="2.62.0" />
+		<PackageReference Include="MA.KeyGenerator.Proto.Client" Version="1.0.1.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="MA.Streaming.UnitTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\MA.Streaming.Proto.Core\MA.Streaming.Proto.Core.csproj" />
+	</ItemGroup>
+
+</Project>

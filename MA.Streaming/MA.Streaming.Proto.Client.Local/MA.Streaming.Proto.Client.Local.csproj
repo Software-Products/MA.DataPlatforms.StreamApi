@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>MA.Streaming.Proto.InApp.Client</Title>
+    <Company>McLaren Applied</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Description>A .NET implementation of the MA Stream API for standalone applications that do not need to connect to a remote gRPC server. The client will instantiate it's own local gRPC server running the Stream API services, without requiring an external Stream API server to be set up.</Description>
+    <Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" Version="2.62.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MA.Streaming.Proto.ServerComponent\MA.Streaming.Proto.ServerComponent.csproj" />
+  </ItemGroup>
+
+</Project>

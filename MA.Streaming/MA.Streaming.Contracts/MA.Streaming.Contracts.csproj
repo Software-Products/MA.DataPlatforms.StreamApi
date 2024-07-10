@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>MA.Streaming.Contracts</Title>
+    <Company>McLaren Applied</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+	<Description>MA Stream API contracts.</Description>
+	<Authors>McLaren Applied</Authors>
+  </PropertyGroup>
+
+</Project>

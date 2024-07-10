@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MA.Streaming.Proto.ServerComponent.Host": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
