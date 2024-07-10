@@ -67,6 +67,8 @@ services:
       - ./Configs:/app/Configs 
 ```
 
+The Kafka and Zookeper containers does not have to be in the same Docker Compose as the Stream API Server. They can be deployed standalone or on a seperate machine if it is required.
+
 ### Standalone
 It is possible to run the Stream API Server as a standalone executable or as a part of another application. In this case, the Stream API Docker image is not needed and can be replaced by the standalone executable.
 
