@@ -15,10 +15,9 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Abstraction
+namespace MA.Streaming.Abstraction;
+
+public interface IParameterListKeyIdentifierCreator
 {
-    public interface IParameterListKeyIdentifierCreator
-    {
-        string Create(IReadOnlyList<string> parametersIdentifiers);
-    }
+    string Create(IReadOnlyList<string> parametersIdentifiers);
 }

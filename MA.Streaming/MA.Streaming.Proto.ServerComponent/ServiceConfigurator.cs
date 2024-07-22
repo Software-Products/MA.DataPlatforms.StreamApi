@@ -35,96 +35,114 @@ using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.Core.Factories;
 using MA.Streaming.Proto.Core.Handlers;
 using MA.Streaming.Proto.Core.Mapper;
+using MA.Streaming.Proto.Core.Model;
 using MA.Streaming.Proto.Core.Providers;
 
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MA.Streaming.Proto.ServerComponent
-{
-    public class ServiceConfigurator
-    {
-        private readonly IStreamingApiConfiguration streamingApiConfiguration;
-        private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+namespace MA.Streaming.Proto.ServerComponent;
 
-        public ServiceConfigurator(
-            IStreamingApiConfiguration streamingApiConfiguration,
-            ICancellationTokenSourceProvider cancellationTokenSourceProvider)
+public class ServiceConfigurator
+{
+    private readonly IStreamingApiConfiguration streamingApiConfiguration;
+    private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+
+    public ServiceConfigurator(
+        IStreamingApiConfiguration streamingApiConfiguration,
+        ICancellationTokenSourceProvider cancellationTokenSourceProvider)
+    {
+        this.streamingApiConfiguration = streamingApiConfiguration;
+        this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+    }
+
+    public void Configure(IServiceCollection serviceCollection)
+    {
+        serviceCollection.AddSingleton<IStreamingApiConfigurationProvider>(new StreamingApiConfigurationProvider(this.streamingApiConfiguration));
+        serviceCollection.AddSingleton<IActiveConnectionManager, ActiveConnectionManager>();
+        serviceCollection.AddSingleton<IRouteBindingInfoRepository, RouteBindingInfoRepository>();
+        serviceCollection.AddSingleton<IStreamWriterHandlerFactory, StreamWriterHandlerFactory>();
+        serviceCollection.AddSingleton(this.cancellationTokenSourceProvider);
+        serviceCollection.AddSingleton<IInMemoryRepository<string, SessionDetailRecord>, ThreadSafeInMemoryRepository<string, SessionDetailRecord>>();
+        serviceCollection.AddSingleton<IInMemoryRepository<string, List<DataFormatRecord>>, ThreadSafeInMemoryRepository<string, List<DataFormatRecord>>>();
+        serviceCollection.AddSingleton<IDataFormatInfoService, DataFormatInfoService>();
+        serviceCollection.AddSingleton<ISessionInfoService, SessionInfoService>();
+        serviceCollection.AddSingleton<IStreamReaderHandlerFactory, StreamReaderHandlerFactory>();
+        serviceCollection.AddSingleton<IDataSourcesRepository, DataSourcesRepository>();
+        serviceCollection.AddSingleton<ISessionNotificationManagerService, SessionNotificationManagerService>();
+
+        serviceCollection
+            .AddSingleton<IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler>,
+                ThreadSafeInMemoryRepository<long, IReadPacketResponseStreamWriterHandler>>();
+
+        serviceCollection
+            .AddSingleton<IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>,
+                ThreadSafeInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>>();
+        serviceCollection
+            .AddSingleton<IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>,
+                ThreadSafeInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>>();
+
+        serviceCollection
+            .AddSingleton<INotificationStreamWriterService<GetSessionStartNotificationResponse>,
+                NotificationStreamWriterService<GetSessionStartNotificationResponse>>();
+        serviceCollection
+            .AddSingleton<INotificationStreamWriterService<GetSessionStopNotificationResponse>,
+                NotificationStreamWriterService<GetSessionStopNotificationResponse>>();
+
+        serviceCollection.AddTransient<ISessionCreationRequestHandler, SessionCreationRequestHandler>();
+        serviceCollection.AddTransient<ISessionEndingRequestHandler, SessionEndingRequestHandler>();
+        serviceCollection.AddTransient<IAddAssociateSessionRequestHandler, AddAssociateSessionRequestHandler>();
+        serviceCollection.AddTransient<ISessionIdentifierUpdateRequestHandler, SessionIdentifierUpdateRequestHandler>();
+        serviceCollection.AddTransient<IGetSessionInfoRequestHandler, GetSessionInfoRequestHandler>();
+        serviceCollection.AddTransient<IPacketWriterHelper, PacketWriterHelper>();
+        serviceCollection.AddTransient<IMapper<Packet, PacketDto>, PacketDtoMapper>();
+        serviceCollection.AddTransient<IMapper<WriteDataPacketRequest, WriteDataPacketRequestDto>, WriteDataPacketRequestDtoMapper>();
+        serviceCollection.AddTransient<IMapper<WriteDataPacketsRequest, IReadOnlyList<WriteDataPacketRequestDto>>, WriteDataPacketsRequestDtoMapper>();
+        serviceCollection.AddTransient<IMapper<WriteInfoPacketRequest, WriteInfoPacketRequestDto>, WriteInfoPacketRequestDtoMapper>();
+        serviceCollection.AddTransient<IMapper<WriteInfoPacketsRequest, WriteInfoPacketRequestDto>, WriteInfoPacketsRequestDtoMapper>();
+        serviceCollection.AddTransient<IMapper<ConnectionInfo, ConnectionDetailsDto>, ConnectionDetailDtoMapper>();
+        serviceCollection.AddTransient<ILogger, MicrosoftLoggerAdapter>();
+        serviceCollection.AddTransient<IPacketWriterConnectorService, PacketWriterConnectorService>();
+        serviceCollection.AddTransient<IRouteNameExtractor, RouteNameExtractor>();
+        serviceCollection.AddTransient<ITopicBaseTopicNameCreator, TopicBaseTopicNameCreator>();
+        serviceCollection.AddTransient<IEssentialTopicNameCreator, EssentialTopicNameCreator>();
+        serviceCollection.AddTransient<IEssentialRouteReaderFactory, EssentialRouteReaderFactory>();
+        serviceCollection.AddTransient<IEssentialPacketsReaderConnectorService, EssentialPacketsReaderConnectorService>();
+        serviceCollection.AddTransient<IEssentialReadRequestHandler, EssentialReadRequestHandler>();
+        serviceCollection.AddTransient<IStreamWriterRepositoryFactory, StreamWriterRepositoryFactory>();
+        serviceCollection.AddTransient<ISessionRouteSubscriberFactory, SessionRouteSubscriberFactory>();
+        serviceCollection.AddTransient<IDataFormatRoutesFactory, DataFormatRoutesFactory>();
+        serviceCollection.AddTransient<IDataFormatRouteSubscriberFactory, DataFormatRouteSubscriberFactory>();
+        serviceCollection.AddTransient<IDtoFromByteFactory<PacketDto>, PacketDtoFromByteFactory>();
+        serviceCollection.AddTransient<IDtoFromByteFactory<DataFormatDefinitionPacketDto>, DataFormatDefinitionPacketDtoFromByteFactory>();
+        serviceCollection.AddTransient<IDtoFromByteFactory<SessionInfoPacketDto>, SessionInfoPacketDtoFromByteFactory>();
+        serviceCollection.AddTransient<IDtoFromByteFactory<NewSessionPacketDto>, NewSessionPacketDtoFromByteFactory>();
+        serviceCollection.AddTransient<IDtoFromByteFactory<EndOfSessionPacketDto>, EndOfSessionPacketDtoFromByteFactory>();
+        serviceCollection.AddTransient<ITypeNameProvider, TypeNameProvider>();
+        serviceCollection.AddTransient<IKafkaTopicHelper, KafkaTopicHelper>();
+        serviceCollection.AddTransient<IParameterListKeyIdentifierCreator, ParameterListKeyIdentifierCreator>();
+        serviceCollection.AddTransient<IServiceResolver, ServiceResolver>();
+        serviceCollection.AddTransient<IStreamsProvider, StreamsProvider>();
+
+        if (this.streamingApiConfiguration.UseRemoteKeyGenerator)
         {
-            this.streamingApiConfiguration = streamingApiConfiguration;
-            this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+            serviceCollection.AddSingleton<IKeyGeneratorService, RemoteKeyGeneratorService>();
+        }
+        else
+        {
+            serviceCollection.AddSingleton<IKeyGeneratorService, KeyGeneratorService>();
         }
 
-        public void Configure(IServiceCollection serviceCollection)
+        if (this.streamingApiConfiguration.StreamCreationStrategy == StreamCreationStrategy.PartitionBased)
         {
-            serviceCollection.AddSingleton<IStreamingApiConfigurationProvider>(new StreamingApiConfigurationProvider(this.streamingApiConfiguration));
-            serviceCollection.AddSingleton<IActiveConnectionManager, ActiveConnectionManager>();
-            serviceCollection.AddSingleton<IRouteBindingInfoRepository, RouteBindingInfoRepository>();
-            serviceCollection.AddSingleton<IStreamWriterHandlerFactory, StreamWriterHandlerFactory>();
-            serviceCollection.AddSingleton(this.cancellationTokenSourceProvider);
-            serviceCollection.AddSingleton<IInMemoryRepository<string, SessionDetailRecord>, ThreadSafeInMemoryRepository<string, SessionDetailRecord>>();
-            serviceCollection.AddSingleton<IInMemoryRepository<string, List<DataFormatRecord>>, ThreadSafeInMemoryRepository<string, List<DataFormatRecord>>>();
-            serviceCollection.AddSingleton<IInMemoryRepository<long, IStreamWriterHandler>, ThreadSafeInMemoryRepository<long, IStreamWriterHandler>>();
-
-            serviceCollection
-                .AddSingleton<IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>,
-                    ThreadSafeInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>>();
-            serviceCollection
-                .AddSingleton<IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>,
-                    ThreadSafeInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>>();
-
-            serviceCollection.AddSingleton<ISessionInfoService, SessionInfoService>();
-            serviceCollection.AddSingleton<IStreamReaderHandlerFactory, StreamReaderHandlerFactory>();
-            serviceCollection.AddSingleton<IDataSourcesRepository, DataSourcesRepository>();
-            serviceCollection.AddSingleton<IDataFormatInfoService, DataFormatInfoService>();
-            serviceCollection.AddTransient<IMapper<Packet, PacketDto>, PacketDtoMapper>();
-            serviceCollection.AddTransient<IMapper<WriteDataPacketRequest, WriteDataPacketRequestDto>, WriteDataPacketRequestDtoMapper>();
-            serviceCollection.AddTransient<IMapper<WriteDataPacketsRequest, IReadOnlyList<WriteDataPacketRequestDto>>, WriteDataPacketsRequestDtoMapper>();
-            serviceCollection.AddTransient<IMapper<WriteInfoPacketRequest, WriteInfoPacketRequestDto>, WriteInfoPacketRequestDtoMapper>();
-            serviceCollection.AddTransient<IMapper<WriteInfoPacketsRequest, WriteInfoPacketRequestDto>, WriteInfoPacketsRequestDtoMapper>();
-            serviceCollection.AddTransient<IMapper<ConnectionInfo, ConnectionDetailsDto>, ConnectionDetailDtoMapper>();
-            serviceCollection.AddTransient<ILogger, MicrosoftLoggerAdapter>();
-            serviceCollection.AddTransient<IPacketWriterConnectorService, PacketWriterConnectorService>();
-            serviceCollection.AddTransient<IRouteNameExtractor, RouteNameExtractor>();
-            serviceCollection.AddTransient<ITopicBaseTopicNameCreator, TopicBaseTopicNameCreator>();
-            serviceCollection.AddTransient<IEssentialTopicNameCreator, EssentialTopicNameCreator>();
-            serviceCollection.AddTransient<IEssentialRouteReaderFactory, EssentialRouteReaderFactory>();
-            serviceCollection.AddTransient<IEssentialPacketsReaderConnectorService, EssentialPacketsReaderConnectorService>();
-            serviceCollection.AddTransient<IEssentialReadRequestHandler, EssentialReadRequestHandler>();
-            serviceCollection.AddTransient<IStreamWriterRepositoryFactory, StreamWriterRepositoryFactory>();
-            serviceCollection.AddTransient<ISessionRouteSubscriberFactory, SessionRouteSubscriberFactory>();
-            serviceCollection.AddTransient<IDataFormatRoutesFactory, DataFormatRoutesFactory>();
-            serviceCollection.AddTransient<IDataFormatRouteSubscriberFactory, DataFormatRouteSubscriberFactory>();
-            serviceCollection.AddTransient<IDtoFromByteFactory<PacketDto>, PacketDtoFromByteFactory>();
-            serviceCollection.AddTransient<IDtoFromByteFactory<DataFormatDefinitionPacketDto>, DataFormatDefinitionPacketDtoFromByteFactory>();
-            serviceCollection.AddTransient<IDtoFromByteFactory<SessionInfoPacketDto>, SessionInfoPacketDtoFromByteFactory>();
-            serviceCollection.AddTransient<IDtoFromByteFactory<NewSessionPacketDto>, NewSessionPacketDtoFromByteFactory>();
-            serviceCollection.AddTransient<IDtoFromByteFactory<EndOfSessionPacketDto>, EndOfSessionPacketDtoFromByteFactory>();
-            serviceCollection.AddTransient<ITypeNameProvider, TypeNameProvider>();
-            serviceCollection.AddTransient<IKafkaTopicHelper, KafkaTopicHelper>();
-            serviceCollection.AddTransient<IParameterListKeyIdentifierCreator, ParameterListKeyIdentifierCreator>();
-            serviceCollection.AddTransient<IServiceResolver, ServiceResolver>();
-
-            if (this.streamingApiConfiguration.UseRemoteKeyGenerator)
-            {
-                serviceCollection.AddSingleton<IKeyGeneratorService, RemoteKeyGeneratorService>();
-            }
-            else
-            {
-                serviceCollection.AddSingleton<IKeyGeneratorService, KeyGeneratorService>();
-            }
-
-            if (this.streamingApiConfiguration.StreamCreationStrategy == StreamCreationStrategy.PartitionBased)
-            {
-                serviceCollection.AddSingleton<IRouterProvider, PartitionBasedRouterProvider>();
-                serviceCollection.AddTransient<IRouteSubscriberFactory, PartitionBasedRouteSubscriberFactory>();
-                serviceCollection.AddTransient<IRouteInfoProvider, PartitionBasedKafkaRouteInfoProvider>();
-            }
-            else
-            {
-                serviceCollection.AddSingleton<IRouterProvider, TopicBasedRouterProvider>();
-                serviceCollection.AddTransient<IRouteSubscriberFactory, TopicBasedRouteSubscriberFactory>();
-                serviceCollection.AddTransient<IRouteInfoProvider, TopicBasedKafkaRouteInfoProvider>();
-            }
+            serviceCollection.AddSingleton<IRouterProvider, PartitionBasedRouterProvider>();
+            serviceCollection.AddTransient<IRouteSubscriberFactory, PartitionBasedRouteSubscriberFactory>();
+            serviceCollection.AddTransient<IRouteInfoProvider, PartitionBasedKafkaRouteInfoProvider>();
+        }
+        else
+        {
+            serviceCollection.AddSingleton<IRouterProvider, TopicBasedRouterProvider>();
+            serviceCollection.AddTransient<IRouteSubscriberFactory, TopicBasedRouteSubscriberFactory>();
+            serviceCollection.AddTransient<IRouteInfoProvider, TopicBasedKafkaRouteInfoProvider>();
         }
     }
 }

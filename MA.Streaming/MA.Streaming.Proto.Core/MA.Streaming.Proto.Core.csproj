@@ -21,14 +21,14 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MA.Streaming.Protocol.OpenData.Proto" Version="1.0.0.14-ci" GeneratePathProperty="true">
+    <PackageReference Include="MA.Streaming.Protocol.OpenData.Proto" Version="1.0.2.1" GeneratePathProperty="true">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <Protobuf Include="$(PkgMA_Streaming_Protocol_OpenData_Proto)/ma/streaming/**/*.proto" GrpcServices="None" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_Protocol_OpenData_Proto)" />  
   </ItemGroup>
   
 	<ItemGroup>
-		<PackageReference Include="MA.Streaming.API.Proto" Version="1.0.0.14-ci" GeneratePathProperty="true">
+		<PackageReference Include="MA.Streaming.API.Proto" Version="1.0.2.1" GeneratePathProperty="true">
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
     <Protobuf Include="$(PkgMA_Streaming_API_Proto)/ma/streaming/**/*.proto" GrpcServices="Both" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_API_Proto);$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_API_Proto)" />	

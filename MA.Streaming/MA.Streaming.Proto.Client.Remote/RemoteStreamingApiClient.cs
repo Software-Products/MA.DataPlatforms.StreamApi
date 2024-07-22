@@ -1,4 +1,4 @@
-// <copyright file="StreamingApiClient.cs" company="McLaren Applied Ltd.">
+// <copyright file="RemoteStreamingApiClient.cs" company="McLaren Applied Ltd.">
 //
 // Copyright 2024 McLaren Applied Ltd
 // 

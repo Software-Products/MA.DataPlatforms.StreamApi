@@ -21,12 +21,10 @@ public class SessionsInfoChangeEventArg
 {
     public readonly string SessionKey;
     public readonly string DataSource;
-    public readonly SessionActionType SessionActionType;
 
-    public SessionsInfoChangeEventArg(string sessionKey, string dataSource, SessionActionType sessionActionType)
+    public SessionsInfoChangeEventArg(string sessionKey, string dataSource)
     {
         this.SessionKey = sessionKey;
         this.DataSource = dataSource;
-        this.SessionActionType = sessionActionType;
     }
 }

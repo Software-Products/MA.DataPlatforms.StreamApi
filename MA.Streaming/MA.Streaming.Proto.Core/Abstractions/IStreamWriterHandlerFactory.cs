@@ -23,7 +23,7 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface IStreamWriterHandlerFactory
 {
-    IStreamWriterHandler? Create(
+    IReadPacketResponseStreamWriterHandler? Create(
         long connectionId,
         IServerStreamWriter<ReadPacketsResponse> serverStreamWriter,
         ServerCallContext context);

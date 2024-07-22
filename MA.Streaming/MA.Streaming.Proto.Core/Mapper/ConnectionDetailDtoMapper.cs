@@ -18,20 +18,19 @@
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 
-namespace MA.Streaming.Proto.Core.Mapper
+namespace MA.Streaming.Proto.Core.Mapper;
+
+public class ConnectionDetailDtoMapper : IMapper<ConnectionInfo, ConnectionDetailsDto>
 {
-    public class ConnectionDetailDtoMapper : IMapper<ConnectionInfo, ConnectionDetailsDto>
+    public ConnectionDetailsDto Map(ConnectionInfo source)
     {
-        public ConnectionDetailsDto Map(ConnectionInfo source)
-        {
-            return new ConnectionDetailsDto(
-                source.Id,
-                source.ConnectionDetails.DataSource,
-                source.ConnectionDetails.EssentialsOffset,
-                source.ConnectionDetails.MainOffset,
-                source.ConnectionDetails.Session,
-                source.ConnectionDetails.StreamOffsets,
-                source.ConnectionDetails.Streams);
-        }
+        return new ConnectionDetailsDto(
+            source.Id,
+            source.ConnectionDetails.DataSource,
+            source.ConnectionDetails.EssentialsOffset,
+            source.ConnectionDetails.MainOffset,
+            source.ConnectionDetails.Session,
+            source.ConnectionDetails.StreamOffsets,
+            source.ConnectionDetails.Streams);
     }
 }

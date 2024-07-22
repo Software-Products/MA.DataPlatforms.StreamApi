@@ -17,20 +17,19 @@
 
 using MA.Streaming.Proto.Core.Abstractions;
 
-namespace MA.Streaming.Proto.ServerComponent
+namespace MA.Streaming.Proto.ServerComponent;
+
+internal class ServiceResolver : IServiceResolver
 {
-    internal class ServiceResolver : IServiceResolver
+    private readonly IServiceProvider serviceProvider;
+
+    public ServiceResolver(IServiceProvider serviceProvider)
     {
-        private readonly IServiceProvider serviceProvider;
+        this.serviceProvider = serviceProvider;
+    }
 
-        public ServiceResolver(IServiceProvider serviceProvider)
-        {
-            this.serviceProvider = serviceProvider;
-        }
-
-        public T? Resolve<T>()
-        {
-            return (T?)this.serviceProvider.GetService(typeof(T));
-        }
+    public T? Resolve<T>()
+    {
+        return (T?)this.serviceProvider.GetService(typeof(T));
     }
 }

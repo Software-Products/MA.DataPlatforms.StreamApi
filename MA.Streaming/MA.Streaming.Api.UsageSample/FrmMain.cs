@@ -105,7 +105,9 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
             "Deployment/docker-compose.yml",
             this.chbDeployKafka.Checked,
             this.chbRemoteKeyGeneratorService.Checked,
-            this.chbUseRemoteStreamApi.Checked);
+            this.chbUseRemoteStreamApi.Checked,
+            (int)this.numTxtApiPort.Value,
+            (int)this.numTxtPromtheusPort.Value);
 
         MessageBox.Show("Deployment files created");
     }
@@ -142,6 +144,7 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         var keyGeneratorServiceAddress = this.chbUseRemoteStreamApi.Checked ? "key-generator-service:15379" : "localhost:15379";
         var remoteKeyGeneratorServiceAddress = useRemoteKeyGenerator ? keyGeneratorServiceAddress : "";
         var streamApiPort = (int)this.numTxtApiPort.Value;
+        var prometheusPort = (int)this.numTxtPromtheusPort.Value;
         return new StreamingApiConfiguration(
             streamCreationStrategy,
             brokerUrl,
@@ -151,7 +154,8 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
             true,
             useRemoteKeyGenerator,
             remoteKeyGeneratorServiceAddress,
-            batchingResponses);
+            batchingResponses,
+            prometheusPort);
     }
 
     private void chbDeployKafka_CheckedChanged(object sender, EventArgs e)
@@ -308,6 +312,26 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
             });
     }
 
+    public void OnSessionStartNotification(string dataSource, string sessionKey)
+    {
+        this.rtxbNotifications.Invoke(
+            () =>
+            {
+                this.rtxbNotifications.Text +=
+                    $"{DateTime.Now.TimeOfDay}:=> New Session Created{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
+            });
+    }
+
+    public void OnSessionStopNotification(string dataSource, string sessionKey)
+    {
+        this.rtxbNotifications.Invoke(
+            () =>
+            {
+                this.rtxbNotifications.Text +=
+                    $"{DateTime.Now.TimeOfDay}:=> Session Stopped{Environment.NewLine}Key:{sessionKey}{Environment.NewLine}DataSource:{dataSource}{Environment.NewLine}-----------------{Environment.NewLine}";
+            });
+    }
+
     private void btnAddAssociateKey_Click(object sender, EventArgs e)
     {
         this.sessionManagementPresenter?.AddAssociateSessionId(this.txtAddAssociateSessionKey.Text, this.txtAddAssociateAssociateKey.Text);
@@ -335,9 +359,9 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         this.dataFormatManagementPresenter?.GetEventDataFormatId(this.txtGetEventFormatIdDataSource.Text, this.txtGetEventFormatIdEventIdentifier.Text);
     }
 
-    public void OnEventDataFormatFetched(string dataSource, string eventIdentifier, string responseDataFormat)
+    public void OnEventDataFormatFetched(string dataSource, string eventIdentifier, ulong dataFormatIdentifier)
     {
-        this.txtGetEventFormatIdFetchedDataFormat.Text = responseDataFormat;
+        this.txtGetEventFormatIdFetchedDataFormat.Text = dataFormatIdentifier.ToString();
     }
 
     public void OnEventFetched(string dataSource, string responseEvent)
@@ -345,9 +369,9 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
         this.txtGetEventFetchedEvent.Text = responseEvent;
     }
 
-    public void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string> parameterIdentifiers, string responseDataFormat)
+    public void OnParameterListDataFormatFetched(string dataSource, IReadOnlyList<string> parameterIdentifiers, ulong dataFormatIdentifier)
     {
-        this.txtGetParamDataFormatFetchedDataFormat.Text = responseDataFormat;
+        this.txtGetParamDataFormatFetchedDataFormat.Text = dataFormatIdentifier.ToString();
     }
 
     public void OnParameterListFetched(string dataSource, IReadOnlyList<string> responseParameters)
@@ -534,6 +558,16 @@ public partial class FrmMain : Form, ISessionManagementPresenterListener, IDataF
 
     private void btnCompleteSession_Click(object sender, EventArgs e)
     {
-        this.sessionManagementPresenter.CompleteSession(this.txtCompleteSessionSessionKey.Text);
+        this.sessionManagementPresenter?.CompleteSession(this.txtCompleteSessionSessionKey.Text);
+    }
+
+    private void btnSubscribeStartNotification_Click(object sender, EventArgs e)
+    {
+        this.sessionManagementPresenter?.SubscribeStartNotifications(this.txbNotificationDataSource.Text);
+    }
+
+    private void btnSubscribeStopNotification_Click(object sender, EventArgs e)
+    {
+        this.sessionManagementPresenter?.SubscribeStopNotifications(this.txbNotificationDataSource.Text);
     }
 }

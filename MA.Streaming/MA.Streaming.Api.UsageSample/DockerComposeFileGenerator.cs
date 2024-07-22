@@ -15,55 +15,67 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Api.UsageSample
-{
-    internal class DockerComposeFileGenerator
-    {
-        public void Generate(string filePath, bool createKafkaServicePart, bool createKeyGeneratorServicePart, bool createStreamApiPart)
-        {
-            if (!createKafkaServicePart &&
-                !createKeyGeneratorServicePart &&
-                !createStreamApiPart)
-            {
-                File.WriteAllText(filePath, "");
-                return;
-            }
+namespace MA.Streaming.Api.UsageSample;
 
-            var dockerComposeFile = @$"
+internal class DockerComposeFileGenerator
+{
+    public void Generate(
+        string filePath,
+        bool createKafkaServicePart,
+        bool createKeyGeneratorServicePart,
+        bool createStreamApiPart,
+        int streamApiRpcPort,
+        int prometheusPort)
+    {
+        if (!createKafkaServicePart &&
+            !createKeyGeneratorServicePart &&
+            !createStreamApiPart)
+        {
+            File.WriteAllText(filePath, "");
+            return;
+        }
+
+        var dockerComposeFile = @$"
 services:  
 
 {this.CreateKafkaComposePart(createKafkaServicePart)}
 
 {this.CreateKeyGeneratorServicePart(createKeyGeneratorServicePart)}
 
-{this.CreateKeyStreamApiPart(createStreamApiPart, createKafkaServicePart, createKeyGeneratorServicePart)}
+{this.CreateKeyStreamApiPart(createStreamApiPart, createKafkaServicePart, createKeyGeneratorServicePart, streamApiRpcPort, prometheusPort)}
 ";
-            File.WriteAllText(filePath, dockerComposeFile);
+        File.WriteAllText(filePath, dockerComposeFile);
+    }
+
+    private string CreateKeyStreamApiPart(
+        bool createStreamApiPart,
+        bool createKafkaServicePart,
+        bool createKeyGeneratorServicePart,
+        int streamApiRpcPort,
+        int prometheusPort)
+    {
+        if (!createStreamApiPart)
+        {
+            return string.Empty;
         }
 
-        private string CreateKeyStreamApiPart(bool createStreamApiPart, bool createKafkaServicePart, bool createKeyGeneratorServicePart)
-        {
-            if (!createStreamApiPart)
-            {
-                return string.Empty;
-            }
-
-            var kafkaDepends = createKafkaServicePart
-                ? @"      - kafka"
-                : "";
-            var keyGenDepends = createKeyGeneratorServicePart
-                ? @"      - key-generator-service"
-                : "";
-            var dependsOn = @$"
+        var kafkaDepends = createKafkaServicePart
+            ? @"      - kafka"
+            : "";
+        var keyGenDepends = createKeyGeneratorServicePart
+            ? @"      - key-generator-service"
+            : "";
+        var dependsOn = @$"
     depends_on:
 {kafkaDepends}
 {keyGenDepends}";
 
-            return $@"
+        return $@"
   stream-api-server:
-    image: mclarenapplied/ma-streaming-proto-server-component-host:1.0.0
+    image: mclarenapplied/streaming-proto-server-host:latest
     ports:
-      - 13579:13579
+      - {streamApiRpcPort}:{streamApiRpcPort}
+      - {prometheusPort}:{prometheusPort}
 {dependsOn}
     restart: always
     environment:     
@@ -72,26 +84,27 @@ services:
     volumes:
       - ./Configs:/app/Configs
 ";
-        }
+    }
 
-
-        private string CreateKeyGeneratorServicePart(bool keyGeneratorServicePart)
-        {
-            return !keyGeneratorServicePart ? string.Empty : @"
+    private string CreateKeyGeneratorServicePart(bool keyGeneratorServicePart)
+    {
+        return !keyGeneratorServicePart
+            ? string.Empty
+            : @"
   key-generator-service:
-    image: mclarenapplied/ma-key-generator-proto-server:1.0.0
+    image: mclarenapplied/keygenerator-proto-server:latest
     ports:    
       - 15379:15379
     environment:
       PORT: 15379
 ";
-        }
+    }
 
-        private string CreateKafkaComposePart(bool createKafkaServicePart)
-        {
-            return !createKafkaServicePart
-                ? string.Empty
-                : @"
+    private string CreateKafkaComposePart(bool createKafkaServicePart)
+    {
+        return !createKafkaServicePart
+            ? string.Empty
+            : @"
   zookeeper:
     image: confluentinc/cp-zookeeper:latest    
     environment:
@@ -115,6 +128,5 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 ";
-        }
     }
 }

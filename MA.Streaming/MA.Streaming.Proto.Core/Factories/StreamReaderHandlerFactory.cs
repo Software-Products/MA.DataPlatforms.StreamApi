@@ -35,7 +35,7 @@ public class StreamReaderHandlerFactory : IStreamReaderHandlerFactory
         this.serviceResolver = serviceResolver;
     }
 
-    public IStreamReaderHandler Create(
+    public IWritePacketRequestStreamReaderHandler Create(
         Guid id,
         IAsyncStreamReader<WriteDataPacketsRequest> asyncStreamReader,
         ServerCallContext context)
@@ -50,6 +50,6 @@ public class StreamReaderHandlerFactory : IStreamReaderHandlerFactory
             throw new InvalidOperationException("Can not create the logger and mapper using service provider");
         }
 
-        return new StreamReaderHandler(id, packetWriterConnectorService, asyncStreamReader, context, new AutoResetEvent(false), dtoMapper, logger);
+        return new WritePacketRequestStreamReaderHandler(id, packetWriterConnectorService, asyncStreamReader, context, new AutoResetEvent(false), dtoMapper, logger);
     }
 }

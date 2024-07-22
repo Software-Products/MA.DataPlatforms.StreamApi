@@ -32,7 +32,7 @@ namespace MA.Streaming.Proto.Core.Factories;
 
 public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
 {
-    private readonly IInMemoryRepository<long, IStreamWriterHandler> handlerRepository;
+    private readonly IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler> handlerRepository;
     private readonly IRouteSubscriberFactory routeSubscriberFactory;
     private readonly IActiveConnectionManager activeConnectionManager;
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
@@ -41,7 +41,7 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
     private readonly object lockObject = new();
 
     public StreamWriterHandlerFactory(
-        IInMemoryRepository<long, IStreamWriterHandler> handlerRepository,
+        IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler> handlerRepository,
         IRouteSubscriberFactory routeSubscriberFactory,
         IActiveConnectionManager activeConnectionManager,
         IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper,
@@ -56,7 +56,7 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
         this.config = apiConfigurationProvider.Provide();
     }
 
-    public IStreamWriterHandler? Create(long connectionId, IServerStreamWriter<ReadPacketsResponse> serverStreamWriter, ServerCallContext context)
+    public IReadPacketResponseStreamWriterHandler? Create(long connectionId, IServerStreamWriter<ReadPacketsResponse> serverStreamWriter, ServerCallContext context)
     {
         lock (this.lockObject)
         {
@@ -79,7 +79,7 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
                 this.routeSubscriberFactory.Create(connectionDetailsDto, routeBindingInfoRepository),
                 this.logger,
                 routeBindingInfoRepository);
-            handler = new StreamWriterHandler(
+            handler = new ReadPacketResponseStreamWriterHandler(
                 connectionDetailsDto,
                 serverStreamWriter,
                 context,

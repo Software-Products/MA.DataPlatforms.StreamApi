@@ -35,7 +35,6 @@ internal static class Program
         };
         Console.WriteLine("Press Ctrl+C to stop the application.");
 
-
         if (!AppDefinition.AutoStart)
         {
             var listener = CreateListener(AppDefinition.ListenerListenerPortNumber);

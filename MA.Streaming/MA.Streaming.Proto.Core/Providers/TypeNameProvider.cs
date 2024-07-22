@@ -16,18 +16,16 @@
 // </copyright>
 
 using MA.Streaming.Abstraction;
-using MA.Streaming.OpenData;
 
-namespace MA.Streaming.Proto.Core.Providers
+namespace MA.Streaming.Proto.Core.Providers;
+
+public class TypeNameProvider : ITypeNameProvider
 {
-    public class TypeNameProvider : ITypeNameProvider
-    {
-        public string NewSessionPacketTypeName => nameof(NewSessionPacket);
+    public string NewSessionPacketTypeName => "NewSession";
 
-        public string EndOfSessionPacketTypeName => nameof(EndOfSessionPacket);
+    public string EndOfSessionPacketTypeName => "EndOfSession";
 
-        public string SessionInfoPacketTypeName => nameof(SessionInfoPacket);
+    public string SessionInfoPacketTypeName => "SessionInfo";
 
-        public string DataFormatDefinitionPacketTypeName => nameof(DataFormatDefinitionPacket);
-    }
+    public string DataFormatDefinitionPacketTypeName => "DataFormatDefinition";
 }
