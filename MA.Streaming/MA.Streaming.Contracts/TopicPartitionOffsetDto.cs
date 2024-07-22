@@ -29,4 +29,9 @@ public class TopicPartitionOffsetDto
         this.Partition = partition;
         this.Offset = offset;
     }
+
+    public override string ToString()
+    {
+        return $"{this.TopicName}:{this.Partition}";
+    }
 }

@@ -52,7 +52,7 @@ public class ThreadSafeInMemoryRepository<TKey, TData> : IInMemoryRepository<TKe
         }
     }
 
-    public IReadOnlyList<TData> GetAll(Func<TData, bool>? predicate=null)
+    public IReadOnlyList<TData> GetAll(Func<TData, bool>? predicate = null)
     {
         this.@lock.EnterReadLock();
         try

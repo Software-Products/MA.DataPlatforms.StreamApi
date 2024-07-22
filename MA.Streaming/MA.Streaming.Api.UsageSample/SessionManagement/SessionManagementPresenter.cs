@@ -31,6 +31,10 @@ internal interface ISessionManagementPresenterListener
     void OnSessionIdentifierUpdated(string sessionKey, string newIdentifier);
 
     void OnSessionInfoFetched(SessionInfo sessionInfo);
+
+    void OnSessionStartNotification(string dataSource, string sessionKey);
+
+    void OnSessionStopNotification(string dataSource, string sessionKey);
 }
 
 internal class SessionManagementPresenter
@@ -38,6 +42,7 @@ internal class SessionManagementPresenter
     private readonly SessionManagementService.SessionManagementServiceClient sessionManagementServiceClient;
     private readonly ILogger logger;
     private readonly ISessionManagementPresenterListener listener;
+    private readonly CancellationTokenSource tokenSource = new();
 
     public SessionManagementPresenter(
         SessionManagementService.SessionManagementServiceClient sessionManagementServiceClient,
@@ -197,12 +202,74 @@ internal class SessionManagementPresenter
                     response.Version,
                     response.AssociateSessionKeys,
                     response.Identifier,
-                    response.IsComplete));
+                    response.IsComplete,
+                    response.MainOffset,
+                    response.EssentialsOffset,
+                    response.Streams,
+                    response.TopicPartitionOffsets.ToDictionary(i => i.Key, i => i.Value)));
         }
         catch (Exception ex)
         {
             this.logger.Error($" Update Session Identifier Exception:{ex} ");
         }
+    }
+
+    public void SubscribeStartNotifications(string dataSource)
+    {
+        var startNotificationStream = this.sessionManagementServiceClient.GetSessionStartNotification(
+            new GetSessionStartNotificationRequest
+            {
+                DataSource = dataSource
+            }).ResponseStream;
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    while (!this.tokenSource.Token.IsCancellationRequested)
+                    {
+                        while (await startNotificationStream.MoveNext(this.tokenSource.Token))
+                        {
+                            var notificationMessage = startNotificationStream.Current;
+                            this.listener.OnSessionStartNotification(notificationMessage.DataSource, notificationMessage.SessionKey);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await File.AppendAllTextAsync("log.txt", ex.ToString());
+                }
+            },
+            this.tokenSource.Token);
+    }
+
+    public void SubscribeStopNotifications(string dataSource)
+    {
+        var stopNotificationStream = this.sessionManagementServiceClient.GetSessionStopNotification(
+            new GetSessionStopNotificationRequest
+            {
+                DataSource = dataSource
+            }).ResponseStream;
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    while (!this.tokenSource.Token.IsCancellationRequested)
+                    {
+                        while (await stopNotificationStream.MoveNext(this.tokenSource.Token))
+                        {
+                            var notificationMessage = stopNotificationStream.Current;
+                            this.listener.OnSessionStopNotification(notificationMessage.DataSource, notificationMessage.SessionKey);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await File.AppendAllTextAsync("log.txt", ex.ToString());
+                }
+            },
+            this.tokenSource.Token);
     }
 
     public void CompleteSession(string sessionKey)

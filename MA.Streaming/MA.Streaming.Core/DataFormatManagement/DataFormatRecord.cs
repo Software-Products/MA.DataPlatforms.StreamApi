@@ -27,7 +27,12 @@ public class DataFormatRecord
     public readonly DataFormatTypeDto DataFormatTypeDto;
     private readonly List<ulong> identifiers;
 
-    public DataFormatRecord(string dataSource, string parametersIdentifierKey, IReadOnlyList<string> parametersIdentifiers, DataFormatTypeDto dataFormatTypeDto, ulong initialIdentifier)
+    public DataFormatRecord(
+        string dataSource,
+        string parametersIdentifierKey,
+        IReadOnlyList<string> parametersIdentifiers,
+        DataFormatTypeDto dataFormatTypeDto,
+        ulong initialIdentifier)
     {
         this.DataSource = dataSource;
         this.ParametersIdentifiers = parametersIdentifiers;

@@ -19,7 +19,11 @@ namespace MA.Streaming.Abstraction;
 
 public interface ISessionInfoService
 {
-    public event EventHandler<SessionsInfoChangeEventArg>? SessionsInfoChanged;
+    public event EventHandler<SessionsInfoChangeEventArg>? SessionStarted;
+
+    public event EventHandler<SessionsInfoChangeEventArg>? SessionStopped;
+
+    public event EventHandler<SessionsInfoChangeEventArg>? SessionUpdated;
 
     public void Start();
 

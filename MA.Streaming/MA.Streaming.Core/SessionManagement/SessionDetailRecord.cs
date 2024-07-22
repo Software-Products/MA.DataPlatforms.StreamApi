@@ -27,12 +27,21 @@ public class SessionDetailRecord
     public readonly string SessionKey;
     public readonly string DataSource;
     public readonly IReadOnlyList<TopicPartitionOffsetDto> StartingOffsetInfo;
+    public readonly long MainOffset;
+    public readonly long EssentialOffset;
 
-    public SessionDetailRecord(string sessionKey, string dataSource, IReadOnlyList<TopicPartitionOffsetDto> startingOffsetInfo)
+    public SessionDetailRecord(
+        string sessionKey,
+        string dataSource,
+        IReadOnlyList<TopicPartitionOffsetDto> startingOffsetInfo,
+        long mainOffset = 0,
+        long essentialOffset = 0)
     {
         this.SessionKey = sessionKey;
         this.DataSource = dataSource;
         this.StartingOffsetInfo = startingOffsetInfo;
+        this.MainOffset = mainOffset;
+        this.EssentialOffset = essentialOffset;
         this.SessionInfoPacket = new SessionInfoPacketDto("", 0, "", []);
         this.Completed = false;
     }
@@ -41,9 +50,12 @@ public class SessionDetailRecord
 
     public bool Completed { get; private set; }
 
-    public void Complete()
+    public IReadOnlyList<TopicPartitionOffsetDto> EndingOffsetInfo { get; private set; } = [];
+
+    public void Complete(IReadOnlyList<TopicPartitionOffsetDto> endingOffsetInfo)
     {
         this.Completed = true;
+        this.EndingOffsetInfo = endingOffsetInfo;
     }
 
     public void SetSessionInfo(SessionInfoPacketDto sessionInfoPacket)

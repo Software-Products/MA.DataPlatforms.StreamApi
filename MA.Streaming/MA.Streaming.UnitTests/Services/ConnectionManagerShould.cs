@@ -47,7 +47,7 @@ public class ConnectionManagerShould
             }
         };
         MetricProviders.NumberOfConnections.WithLabels(request.Details.DataSource).Set(0);
-       var context = Substitute.For<ServerCallContext>();
+        var context = Substitute.For<ServerCallContext>();
 
         // Act
         var connection1 = await this.connectionManager.NewConnection(request, context);
@@ -152,7 +152,7 @@ public class ConnectionManagerShould
         };
 
         // Act
-        var closeResponse =await this.connectionManager.CloseConnection(closeRequest, context);
+        var closeResponse = await this.connectionManager.CloseConnection(closeRequest, context);
 
         // Assert
         closeResponse.Success.Should().BeFalse();
@@ -165,7 +165,7 @@ public class ConnectionManagerShould
             }
         };
 
-        var connection =await this.connectionManager.GetConnection(getRequest, context);
+        var connection = await this.connectionManager.GetConnection(getRequest, context);
         connection.Details.Should().BeEquivalentTo(newRequest.Details);
         MetricProviders.NumberOfConnections.WithLabels(newRequest.Details.DataSource).Value.Should().Be(1);
     }

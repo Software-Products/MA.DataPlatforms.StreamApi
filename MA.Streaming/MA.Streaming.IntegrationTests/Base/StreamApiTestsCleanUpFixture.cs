@@ -15,17 +15,17 @@
 // limitations under the License.
 // </copyright>
 
-using MA.Streaming.Proto.Client.Local;
 using System.Diagnostics.CodeAnalysis;
 
-namespace MA.Streaming.IntegrationTests.Base
+using MA.Streaming.Proto.Client.Local;
+
+namespace MA.Streaming.IntegrationTests.Base;
+
+[ExcludeFromCodeCoverage]
+public class StreamApiTestsCleanUpFixture : IDisposable
 {
-    [ExcludeFromCodeCoverage]
-    public class StreamApiTestsCleanUpFixture : IDisposable
+    public void Dispose()
     {
-        public void Dispose()
-        {
-            StreamingApiClient.Shutdown();
-        }
+        StreamingApiClient.Shutdown();
     }
 }

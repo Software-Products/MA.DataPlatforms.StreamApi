@@ -15,10 +15,9 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Proto.Core.Abstractions
+namespace MA.Streaming.Proto.Core.Abstractions;
+
+public interface IStreamWriterRepositoryFactory
 {
-    public interface IStreamWriterRepositoryFactory
-    {
-        IServerStreamWriterRepository<T> Create<T>();
-    }
+    IServerStreamWriterRepository<T> Create<T>();
 }

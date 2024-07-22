@@ -44,7 +44,8 @@ public class DataFormatDefinitionPacketDtoFromByteFactory : IDtoFromByteFactory<
                 lstContentIdentifiers.Add(packet.EventIdentifier);
             }
 
-            if (packet.ParameterIdentifiers != null && packet.ParameterIdentifiers.ParameterIdentifiers.Count > 0)
+            if (packet.ParameterIdentifiers != null &&
+                packet.ParameterIdentifiers.ParameterIdentifiers.Count > 0)
             {
                 lstContentIdentifiers.AddRange(packet.ParameterIdentifiers.ParameterIdentifiers);
             }

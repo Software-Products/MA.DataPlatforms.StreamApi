@@ -20,35 +20,34 @@ using MA.KeyGenerator.Proto.Client;
 using MA.Streaming.Abstraction;
 using MA.Streaming.KeyGenerator;
 
-namespace MA.Streaming.Proto.ServerComponent
+namespace MA.Streaming.Proto.ServerComponent;
+
+public class RemoteKeyGeneratorService : IKeyGeneratorService
 {
-    public class RemoteKeyGeneratorService : IKeyGeneratorService
+    private readonly UniqueKeyGeneratorService.UniqueKeyGeneratorServiceClient client;
+
+    public RemoteKeyGeneratorService(IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
     {
-        private readonly UniqueKeyGeneratorService.UniqueKeyGeneratorServiceClient client;
+        var config = streamingApiConfigurationProvider.Provide();
+        KeyGeneratorClient.Initialise(config.RemoteKeyGeneratorServiceAddress);
+        this.client = KeyGeneratorClient.GetKeyGeneratorClient();
+    }
 
-        public RemoteKeyGeneratorService(IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
-        {
-            var config = streamingApiConfigurationProvider.Provide();
-            KeyGeneratorClient.Initialise(config.RemoteKeyGeneratorServiceAddress);
-            this.client = KeyGeneratorClient.GetKeyGeneratorClient();
-        }
+    public string GenerateStringKey()
+    {
+        return this.client.GenerateUniqueKey(
+            new GenerateUniqueKeyRequest
+            {
+                Type = KeyType.String
+            }).StringKey;
+    }
 
-        public string GenerateStringKey()
-        {
-            return this.client.GenerateUniqueKey(
-                new GenerateUniqueKeyRequest
-                {
-                    Type = KeyType.String
-                }).StringKey;
-        }
-
-        public ulong GenerateUlongKey()
-        {
-            return this.client.GenerateUniqueKey(
-                new GenerateUniqueKeyRequest
-                {
-                    Type = KeyType.Ulong
-                }).UlongKey;
-        }
+    public ulong GenerateUlongKey()
+    {
+        return this.client.GenerateUniqueKey(
+            new GenerateUniqueKeyRequest
+            {
+                Type = KeyType.Ulong
+            }).UlongKey;
     }
 }

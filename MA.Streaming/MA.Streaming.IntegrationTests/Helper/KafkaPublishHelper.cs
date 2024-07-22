@@ -17,37 +17,36 @@
 
 using Confluent.Kafka;
 
-namespace MA.Streaming.IntegrationTests.Helper
+namespace MA.Streaming.IntegrationTests.Helper;
+
+internal class KafkaPublishHelper
 {
-    internal class KafkaPublishHelper
+    private readonly IProducer<string?, byte[]> producer;
+
+    public KafkaPublishHelper(string brokerUrl)
     {
-        private readonly IProducer<string?, byte[]> producer;
-
-        public KafkaPublishHelper(string brokerUrl)
+        var configuration = new ProducerConfig
         {
-            var configuration = new ProducerConfig
-            {
-                BootstrapServers = brokerUrl
-            };
-            this.producer = new ProducerBuilder<string?, byte[]>(configuration).Build();
+            BootstrapServers = brokerUrl
+        };
+        this.producer = new ProducerBuilder<string?, byte[]>(configuration).Build();
+    }
+
+    public void PublishData(string topic, byte[] data, string? key = "", int partition = 0)
+    {
+        try
+        {
+            this.producer.Produce(
+                new TopicPartition(topic, partition),
+                new Message<string?, byte[]>
+                {
+                    Key = key,
+                    Value = data
+                });
         }
-
-        public void PublishData(string topic, byte[] data, string? key = "", int partition = 0)
+        catch (Exception ex)
         {
-            try
-            {
-                this.producer.Produce(
-                    new TopicPartition(topic, partition),
-                    new Message<string?, byte[]>
-                    {
-                        Key = key,
-                        Value = data
-                    });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-            }
+            Console.WriteLine(ex.ToString());
         }
     }
 }

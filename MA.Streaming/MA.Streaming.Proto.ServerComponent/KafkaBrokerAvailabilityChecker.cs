@@ -19,41 +19,40 @@ using Confluent.Kafka;
 
 using MA.Streaming.Abstraction;
 
-namespace MA.Streaming.Proto.ServerComponent
-{
-    public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
-    {
-        public bool Check(string brokerUrl)
-        {
-            return IsBrokerAvailable(brokerUrl);
-        }
+namespace MA.Streaming.Proto.ServerComponent;
 
-        private static bool IsBrokerAvailable(string brokerUrl)
+public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
+{
+    public bool Check(string brokerUrl)
+    {
+        return IsBrokerAvailable(brokerUrl);
+    }
+
+    private static bool IsBrokerAvailable(string brokerUrl)
+    {
+        try
         {
-            try
+            var config = new AdminClientConfig
             {
-                var config = new AdminClientConfig
-                {
-                    BootstrapServers = brokerUrl
-                };
-                using var adminClient = new AdminClientBuilder(config).Build();
-                var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(2));
-                if (metadata.Brokers.Count > 0)
-                {
-                    Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
-                    return true;
-                }
-                else
-                {
-                    Console.WriteLine("Kafka broker is not available. Retrying in 5 seconds...");
-                    return false;
-                }
+                BootstrapServers = brokerUrl
+            };
+            using var adminClient = new AdminClientBuilder(config).Build();
+            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(2));
+            if (metadata.Brokers.Count > 0)
+            {
+                Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
+                return true;
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine(ex.ToString());
+                Console.WriteLine("Kafka broker is not available. Retrying in 5 seconds...");
                 return false;
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+            return false;
         }
     }
 }

@@ -20,17 +20,16 @@ using System.Diagnostics.CodeAnalysis;
 using MA.Streaming.IntegrationTests.Helper;
 using MA.Streaming.Proto.Client.Local;
 
-namespace MA.Streaming.IntegrationTests.Base
-{
-    [ExcludeFromCodeCoverage]
-    public class KafkaTestsCleanUpFixture : IDisposable
-    {
-        private const string BrokerUrl = "localhost:9097";
+namespace MA.Streaming.IntegrationTests.Base;
 
-        public void Dispose()
-        {
-            new KafkaClearHelper(BrokerUrl).Clear().Wait();
-            StreamingApiClient.Shutdown();
-        }
+[ExcludeFromCodeCoverage]
+public class KafkaTestsCleanUpFixture : IDisposable
+{
+    private const string BrokerUrl = "localhost:9097";
+
+    public void Dispose()
+    {
+        new KafkaClearHelper(BrokerUrl).Clear().Wait();
+        StreamingApiClient.Shutdown();
     }
 }

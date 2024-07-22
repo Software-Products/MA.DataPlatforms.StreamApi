@@ -20,30 +20,29 @@ using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.OpenData;
 
-namespace MA.Streaming.Proto.Core.Factories
+namespace MA.Streaming.Proto.Core.Factories;
+
+public class PacketDtoFromByteFactory : IDtoFromByteFactory<PacketDto>
 {
-    public class PacketDtoFromByteFactory : IDtoFromByteFactory<PacketDto>
+    private readonly ILogger apiLogger;
+
+    public PacketDtoFromByteFactory(ILogger apiLogger)
     {
-        private readonly ILogger apiLogger;
+        this.apiLogger = apiLogger;
+    }
 
-        public PacketDtoFromByteFactory(ILogger apiLogger)
+    public PacketDto? ToDto(byte[] content)
+    {
+        try
         {
-            this.apiLogger = apiLogger;
+            var packet = Packet.Parser.ParseFrom(content);
+            return new PacketDto(packet.Type, packet.SessionKey, packet.IsEssential, packet.Content.ToByteArray());
         }
-
-        public PacketDto? ToDto(byte[] content)
+        catch (Exception ex)
         {
-            try
-            {
-                var packet = Packet.Parser.ParseFrom(content);
-                return new PacketDto(packet.Type, packet.SessionKey, packet.IsEssential, packet.Content.ToByteArray());
-            }
-            catch (Exception ex)
-            {
-                this.apiLogger.Error($"can not parsing the byte array content to the Packet. exception: {ex}");
+            this.apiLogger.Error($"can not parsing the byte array content to the Packet. exception: {ex}");
 
-                return null;
-            }
+            return null;
         }
     }
 }

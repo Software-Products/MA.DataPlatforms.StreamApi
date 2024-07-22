@@ -36,6 +36,7 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
     private readonly IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> dataFormatByUlongIdentifierRepository;
     private readonly IMapper<Packet, PacketDto> packetDtoMapper;
     private readonly IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator;
+    private readonly ITypeNameProvider typeNameProvider;
 
     public DataFormatManager(
         IKeyGeneratorService keyGeneratorService,
@@ -43,7 +44,8 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord> dataFormatByParamIdentifierRepository,
         IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository,
         IMapper<Packet, PacketDto> packetDtoMapper,
-        IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator)
+        IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator,
+        ITypeNameProvider typeNameProvider)
     {
         this.keyGeneratorService = keyGeneratorService;
         this.packetWriterConnectorService = packetWriterConnectorService;
@@ -51,6 +53,7 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         this.dataFormatByUlongIdentifierRepository = dataFormatByUlongIdentifierRepository;
         this.packetDtoMapper = packetDtoMapper;
         this.parameterListKeyIdentifierCreator = parameterListKeyIdentifierCreator;
+        this.typeNameProvider = typeNameProvider;
     }
 
     public override async Task<GetEventDataFormatIdResponse> GetEventDataFormatId(GetEventDataFormatIdRequest request, ServerCallContext context)
@@ -62,29 +65,29 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
             return await Task.FromResult(
                 new GetEventDataFormatIdResponse
                 {
-                    DataFormat = foundItem.Identifiers[0].ToString()
+                    DataFormatIdentifier = foundItem.Identifiers[0]
                 });
         }
 
         var identifier = this.keyGeneratorService.GenerateUlongKey();
         var dataFormatDefinitionPacket = CreateEventDefinitionPacket(request.Event, identifier);
-        var essentialPacket = CreateEssentialPacket(dataFormatDefinitionPacket);
+        var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
         this.WriteDataPacket(essentialPacket, request.DataSource);
         return await Task.FromResult(
             new GetEventDataFormatIdResponse
             {
-                DataFormat = identifier.ToString()
+                DataFormatIdentifier = identifier
             });
     }
 
-    private static Packet CreateEssentialPacket(DataFormatDefinitionPacket dataFormatDefinitionPacket)
+    private Packet CreateEssentialPacket(DataFormatDefinitionPacket dataFormatDefinitionPacket)
     {
         var essentialPacket = new Packet
         {
             SessionKey = string.Empty,
             Content = dataFormatDefinitionPacket.ToByteString(),
             IsEssential = true,
-            Type = nameof(DataFormatDefinitionPacket)
+            Type = this.typeNameProvider.DataFormatDefinitionPacketTypeName
         };
         return essentialPacket;
     }
@@ -119,13 +122,8 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
 
     public override async Task<GetEventResponse> GetEvent(GetEventRequest request, ServerCallContext context)
     {
-        if (!ulong.TryParse(request.DataFormat, out var ulongIdentifier))
-        {
-            return await Task.FromResult(new GetEventResponse());
-        }
-
         var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-            new ValueTuple<string, ulong, DataFormatTypeDto>(request.DataSource, ulongIdentifier, DataFormatTypeDto.Event));
+            new ValueTuple<string, ulong, DataFormatTypeDto>(request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Event));
 
         if (dataFormatRecord == null)
         {
@@ -147,34 +145,29 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
 
         if (foundItem != null)
         {
-            var dataFormat = foundItem.Identifiers[0].ToString();
+            var dataFormatIdentifier = foundItem.Identifiers[0];
             return await Task.FromResult(
                 new GetParameterDataFormatIdResponse
                 {
-                    DataFormat = dataFormat
+                    DataFormatIdentifier = dataFormatIdentifier
                 });
         }
 
         var identifier = this.keyGeneratorService.GenerateUlongKey();
         var dataFormatDefinitionPacket = CreateParamListDefinitionPacket(request.Parameters, identifier);
-        var essentialPacket = CreateEssentialPacket(dataFormatDefinitionPacket);
+        var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
         this.WriteDataPacket(essentialPacket, request.DataSource);
         return await Task.FromResult(
             new GetParameterDataFormatIdResponse
             {
-                DataFormat = identifier.ToString()
+                DataFormatIdentifier = identifier
             });
     }
 
     public override async Task<GetParametersListResponse> GetParametersList(GetParametersListRequest request, ServerCallContext context)
     {
-        if (!ulong.TryParse(request.DataFormat, out var ulongIdentifier))
-        {
-            return await Task.FromResult(new GetParametersListResponse());
-        }
-
         var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-            new ValueTuple<string, ulong, DataFormatTypeDto>(request.DataSource, ulongIdentifier, DataFormatTypeDto.Parameter));
+            new ValueTuple<string, ulong, DataFormatTypeDto>(request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Parameter));
         if (dataFormatRecord == null)
         {
             return await Task.FromResult(new GetParametersListResponse());

@@ -33,232 +33,231 @@ using MA.Streaming.Proto.ServerComponent;
 
 using Xunit;
 
-namespace MA.Streaming.IntegrationTests
+namespace MA.Streaming.IntegrationTests;
+
+[Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
+public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
 {
-    [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-    public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
+    private const string BrokerUrl = "localhost:9097";
+    private const string DataSource = "DataFormat_Manager_Test_DataSource";
+    private const string Stream1 = "stream1";
+    internal const string Stream2 = "stream2";
+    private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
+    private readonly ulong preExistEventUlongIdentifier;
+    private readonly List<string> preExistParameterIdentifiersList;
+    private readonly ulong preExistParamUlongIdentifier;
+    private const string PreExistEventIdentifier = "event1";
+
+    public DataFormatManagerShould(KafkaTestsCleanUpFixture _)
     {
-        private const string BrokerUrl = "localhost:9097";
-        private const string DataSource = "DataFormat_Manager_Test_DataSource";
-        private const string Stream1 = "stream1";
-        internal const string Stream2 = "stream2";
-        private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
-        private readonly ulong preExistEventUlongIdentifier;
-        private readonly List<string> preExistParameterIdentifiersList;
-        private readonly ulong preExistParamUlongIdentifier;
-        const string PreExistEventIdentifier = "event1";
+        var keyGenerator = new KeyGeneratorService();
+        var essentialTopicNameCreator = new EssentialTopicNameCreator();
+        var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
+        var essentialTopic = essentialTopicNameCreator.Create(DataSource);
+        new KafkaClearHelper(BrokerUrl).Clear().Wait();
+        StreamingApiClient.Shutdown();
 
-        public DataFormatManagerShould(KafkaTestsCleanUpFixture _)
+        this.preExistParamUlongIdentifier = keyGenerator.GenerateUlongKey();
+        this.preExistParameterIdentifiersList =
+        [
+            "Param1",
+            "Param2",
+            "Param3"
+        ];
+        var parameterDataFormatDefinitionPacket = new DataFormatDefinitionPacket
         {
-            var keyGenerator = new KeyGeneratorService();
-            var essentialTopicNameCreator = new EssentialTopicNameCreator();
-            var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
-            var essentialTopic = essentialTopicNameCreator.Create(DataSource);
-            new KafkaClearHelper(BrokerUrl).Clear().Wait();
-            StreamingApiClient.Shutdown();
-
-            this.preExistParamUlongIdentifier = keyGenerator.GenerateUlongKey();
-            this.preExistParameterIdentifiersList =
-            [
-                "Param1",
-                "Param2",
-                "Param3"
-            ];
-            var parameterDataFormatDefinitionPacket = new DataFormatDefinitionPacket
+            Type = DataFormatType.Parameter,
+            ParameterIdentifiers = new ParameterList
             {
-                Type = DataFormatType.Parameter,
-                ParameterIdentifiers = new ParameterList
-                {
-                    ParameterIdentifiers =
-                    {
-                        this.preExistParameterIdentifiersList
-                    }
-                },
-                Identifier = this.preExistParamUlongIdentifier
-            };
-
-            this.preExistEventUlongIdentifier = keyGenerator.GenerateUlongKey();
-
-            var eventDataFormatDefinitionPacket = new DataFormatDefinitionPacket
-            {
-                Type = DataFormatType.Event,
-                EventIdentifier = PreExistEventIdentifier,
-                Identifier = this.preExistEventUlongIdentifier
-            };
-
-            kafkaPublishHelper.PublishData(
-                essentialTopic,
-                GetPacketBytes(nameof(DataFormatDefinitionPacket), parameterDataFormatDefinitionPacket.ToByteString()));
-            kafkaPublishHelper.PublishData(
-                essentialTopic,
-                GetPacketBytes(nameof(DataFormatDefinitionPacket), eventDataFormatDefinitionPacket.ToByteString()));
-            Task.Delay(5000).Wait();
-            var apiConfigurationProvider =
-                new StreamingApiConfigurationProvider(
-                    new StreamingApiConfiguration(
-                        StreamCreationStrategy.PartitionBased,
-                        BrokerUrl,
-                        [new PartitionMapping(Stream1, 1), new PartitionMapping(Stream2, 2)],
-                        integrateDataFormatManagement: true,
-                        integrateSessionManagement: false));
-
-            StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker());
-            this.dataFormatManagerServiceClient = StreamingApiClient.GetDataFormatManagerClient();
-            new AutoResetEvent(false).WaitOne(5000);
-        }
-
-        [Fact]
-        public void Initialise_The_Data_Format_Management_Repository_With_Exist_Data()
-        {
-            //arrange
-            var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
-            {
-                DataSource = DataSource,
-                Event = PreExistEventIdentifier
-            };
-
-            //act
-
-            var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
-
-            //assert
-            var eventDataFormat = eventDataFormatIdResponse.DataFormat;
-            eventDataFormat.Should().Be(this.preExistEventUlongIdentifier.ToString());
-
-            //arrange
-            var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
-            {
-                DataSource = DataSource,
-                Parameters =
+                ParameterIdentifiers =
                 {
                     this.preExistParameterIdentifiersList
                 }
-            };
+            },
+            Identifier = this.preExistParamUlongIdentifier
+        };
 
-            //act
+        this.preExistEventUlongIdentifier = keyGenerator.GenerateUlongKey();
 
-            var getParameterDataFormatIdResponse = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
-
-            //assert
-            var parameterDataFormat = getParameterDataFormatIdResponse.DataFormat;
-            parameterDataFormat.Should().Be(this.preExistParamUlongIdentifier.ToString());
-
-            //arrange
-            var getEventRequest = new GetEventRequest
-            {
-                DataSource = DataSource,
-                DataFormat = eventDataFormat
-            };
-
-            //act
-
-            var getEventResponse = this.dataFormatManagerServiceClient.GetEvent(getEventRequest);
-
-            //assert
-            getEventResponse.Event.Should().Be(PreExistEventIdentifier);
-
-            //arrange
-            var getParametersListRequest = new GetParametersListRequest
-            {
-                DataSource = DataSource,
-                DataFormat = parameterDataFormat
-            };
-
-            //act
-
-            var getParametersListResponse = this.dataFormatManagerServiceClient.GetParametersList(getParametersListRequest);
-
-            //assert
-            getParametersListResponse.Parameters.Should().BeEquivalentTo(this.preExistParameterIdentifiersList);
-        }
-
-        [Fact]
-        public void Do_The_Data_Format_Managment_Manipulation_Actions_Properly()
+        var eventDataFormatDefinitionPacket = new DataFormatDefinitionPacket
         {
-            /////////////////////////////////////Get Id For New Event////////////////////////////////////////////////////////////////////////
-            //arrange
-            const string NewEvent = "NewEvent";
-            var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
-            {
-                DataSource = DataSource,
-                Event = NewEvent
-            };
+            Type = DataFormatType.Event,
+            EventIdentifier = PreExistEventIdentifier,
+            Identifier = this.preExistEventUlongIdentifier
+        };
 
-            //act
+        kafkaPublishHelper.PublishData(
+            essentialTopic,
+            GetPacketBytes(nameof(DataFormatDefinitionPacket), parameterDataFormatDefinitionPacket.ToByteString()));
+        kafkaPublishHelper.PublishData(
+            essentialTopic,
+            GetPacketBytes(nameof(DataFormatDefinitionPacket), eventDataFormatDefinitionPacket.ToByteString()));
+        Task.Delay(5000).Wait();
+        var apiConfigurationProvider =
+            new StreamingApiConfigurationProvider(
+                new StreamingApiConfiguration(
+                    StreamCreationStrategy.PartitionBased,
+                    BrokerUrl,
+                    [new PartitionMapping(Stream1, 1), new PartitionMapping(Stream2, 2)],
+                    integrateDataFormatManagement: true,
+                    integrateSessionManagement: false));
 
-            var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
+        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker());
+        this.dataFormatManagerServiceClient = StreamingApiClient.GetDataFormatManagerClient();
+        new AutoResetEvent(false).WaitOne(5000);
+    }
 
-            //assert
-            var eventDataFormat = eventDataFormatIdResponse.DataFormat;
-            ulong.TryParse(eventDataFormat, out var eventDatFormatId).Should().BeTrue();
-            eventDatFormatId.Should().BeGreaterThan(0);
-
-            //////////////////////////////////////Get New Event Data///////////////////////////////////////////////////////////////////
-            new AutoResetEvent(false).WaitOne(1000);
-            //arrange
-            var getEventRequest = new GetEventRequest
-            {
-                DataSource = DataSource,
-                DataFormat = eventDataFormat
-            };
-
-            //act
-            var getEventResponse = this.dataFormatManagerServiceClient.GetEvent(getEventRequest);
-
-            //assert
-            getEventResponse.Event.Should().Be(NewEvent);
-
-            ///////////////////////////////////////Get Id For New Parameter///////////////////////////////////////////////////////////////////////
-            new AutoResetEvent(false).WaitOne(1000);
-            //arrange
-            const string NewParameter = "NewParameter";
-            var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
-            {
-                DataSource = DataSource,
-                Parameters =
-                {
-                    NewParameter
-                }
-            };
-
-            //act
-
-            var getParameterDataFormatIdResponse = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
-
-            //assert
-            var parameterDataFormat = getParameterDataFormatIdResponse.DataFormat;
-            ulong.TryParse(parameterDataFormat, out var parameterDatFormatId).Should().BeTrue();
-            parameterDatFormatId.Should().BeGreaterThan(0);
-            //////////////////////////////////////Get New Parameter Data///////////////////////////////////////////////////////////////////
-            new AutoResetEvent(false).WaitOne(1000);
-            //arrange
-            var getParametersListRequest = new GetParametersListRequest
-            {
-                DataSource = DataSource,
-                DataFormat = parameterDataFormat
-            };
-
-            //act
-
-            var getParametersListResponse = this.dataFormatManagerServiceClient.GetParametersList(getParametersListRequest);
-
-            //assert
-            getParametersListResponse.Parameters.Should().BeEquivalentTo(
-                new List<string>
-                {
-                    NewParameter
-                });
-        }
-
-        private static byte[] GetPacketBytes(string packetType, ByteString content)
+    [Fact]
+    public void Initialise_The_Data_Format_Management_Repository_With_Exist_Data()
+    {
+        //arrange
+        var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
         {
-            return new Packet
+            DataSource = DataSource,
+            Event = PreExistEventIdentifier
+        };
+
+        //act
+
+        var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
+
+        //assert
+        var eventDataFormat = eventDataFormatIdResponse.DataFormatIdentifier;
+        eventDataFormat.Should().Be(this.preExistEventUlongIdentifier);
+
+        //arrange
+        var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
+        {
+            DataSource = DataSource,
+            Parameters =
             {
-                Content = content,
-                IsEssential = false,
-                SessionKey = "",
-                Type = packetType
-            }.ToByteArray();
-        }
+                this.preExistParameterIdentifiersList
+            }
+        };
+
+        //act
+
+        var getParameterDataFormatIdResponse = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
+
+        //assert
+        var parameterDataFormat = getParameterDataFormatIdResponse.DataFormatIdentifier;
+        parameterDataFormat.Should().Be(this.preExistParamUlongIdentifier);
+
+        //arrange
+        var getEventRequest = new GetEventRequest
+        {
+            DataSource = DataSource,
+            DataFormatIdentifier = eventDataFormat
+        };
+
+        //act
+
+        var getEventResponse = this.dataFormatManagerServiceClient.GetEvent(getEventRequest);
+
+        //assert
+        getEventResponse.Event.Should().Be(PreExistEventIdentifier);
+
+        //arrange
+        var getParametersListRequest = new GetParametersListRequest
+        {
+            DataSource = DataSource,
+            DataFormatIdentifier = parameterDataFormat
+        };
+
+        //act
+
+        var getParametersListResponse = this.dataFormatManagerServiceClient.GetParametersList(getParametersListRequest);
+
+        //assert
+        getParametersListResponse.Parameters.Should().BeEquivalentTo(this.preExistParameterIdentifiersList);
+    }
+
+    [Fact]
+    public void Do_The_Data_Format_Management_Manipulation_Actions_Properly()
+    {
+        /////////////////////////////////////Get Id For New Event////////////////////////////////////////////////////////////////////////
+        //arrange
+        const string NewEvent = "NewEvent";
+        var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
+        {
+            DataSource = DataSource,
+            Event = NewEvent
+        };
+
+        //act
+
+        var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
+
+        //assert
+        var eventDataFormatIdentifier = eventDataFormatIdResponse.DataFormatIdentifier;
+
+        eventDataFormatIdentifier.Should().BeGreaterThan(0);
+
+        //////////////////////////////////////Get New Event Data///////////////////////////////////////////////////////////////////
+        new AutoResetEvent(false).WaitOne(1000);
+        //arrange
+        var getEventRequest = new GetEventRequest
+        {
+            DataSource = DataSource,
+            DataFormatIdentifier = eventDataFormatIdentifier
+        };
+
+        //act
+        var getEventResponse = this.dataFormatManagerServiceClient.GetEvent(getEventRequest);
+
+        //assert
+        getEventResponse.Event.Should().Be(NewEvent);
+
+        ///////////////////////////////////////Get Id For New Parameter///////////////////////////////////////////////////////////////////////
+        new AutoResetEvent(false).WaitOne(1000);
+        //arrange
+        const string NewParameter = "NewParameter";
+        var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
+        {
+            DataSource = DataSource,
+            Parameters =
+            {
+                NewParameter
+            }
+        };
+
+        //act
+
+        var getParameterDataFormatIdResponse = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
+
+        //assert
+        var dataFormatIdentifier = getParameterDataFormatIdResponse.DataFormatIdentifier;
+
+        dataFormatIdentifier.Should().BeGreaterThan(0);
+        //////////////////////////////////////Get New Parameter Data///////////////////////////////////////////////////////////////////
+        new AutoResetEvent(false).WaitOne(1000);
+        //arrange
+        var getParametersListRequest = new GetParametersListRequest
+        {
+            DataSource = DataSource,
+            DataFormatIdentifier = dataFormatIdentifier
+        };
+
+        //act
+
+        var getParametersListResponse = this.dataFormatManagerServiceClient.GetParametersList(getParametersListRequest);
+
+        //assert
+        getParametersListResponse.Parameters.Should().BeEquivalentTo(
+            new List<string>
+            {
+                NewParameter
+            });
+    }
+
+    private static byte[] GetPacketBytes(string packetType, ByteString content)
+    {
+        return new Packet
+        {
+            Content = content,
+            IsEssential = false,
+            SessionKey = "",
+            Type = packetType.Replace(nameof(Packet), "")
+        }.ToByteArray();
     }
 }

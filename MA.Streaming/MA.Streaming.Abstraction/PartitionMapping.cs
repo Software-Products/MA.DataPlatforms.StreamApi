@@ -15,18 +15,17 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Abstraction
+namespace MA.Streaming.Abstraction;
+
+public class PartitionMapping
 {
-    public class PartitionMapping
+    public PartitionMapping(string stream, int partition)
     {
-        public PartitionMapping(string stream, int partition)
-        {
-            this.Stream = stream;
-            this.Partition = partition;
-        }
-
-        public string Stream { get; }
-
-        public int Partition { get; }
+        this.Stream = stream;
+        this.Partition = partition;
     }
+
+    public string Stream { get; }
+
+    public int Partition { get; }
 }

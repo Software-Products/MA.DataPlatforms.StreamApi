@@ -23,8 +23,12 @@ using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
+using MA.Streaming.Proto.Core.Handlers;
+using MA.Streaming.Proto.Core.Model;
+using MA.Streaming.Proto.Core.Providers;
 using MA.Streaming.Proto.Core.Services;
 
 using NSubstitute;
@@ -45,11 +49,14 @@ public class SessionManagementServiceShould
     private readonly IPacketWriterConnectorService writeConnectorService;
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoMemoryRepository;
     private readonly ILogger logger;
+    private readonly TypeNameProvider typeNameProvider;
+    private readonly IStreamsProvider streamsProvider;
 
     public SessionManagementServiceShould()
     {
         this.sessionKeyGenerator = Substitute.For<IKeyGeneratorService>();
         this.routeInfoProvider = Substitute.For<IRouteInfoProvider>();
+        this.streamsProvider = Substitute.For<IStreamsProvider>();
         this.writeConnectorService = Substitute.For<IPacketWriterConnectorService>();
         var sessionInfoService = Substitute.For<ISessionInfoService>();
         this.sessionInfoMemoryRepository = Substitute.For<IInMemoryRepository<string, SessionDetailRecord>>();
@@ -61,15 +68,35 @@ public class SessionManagementServiceShould
 
         this.sessionKeyGenerator.GenerateStringKey().Returns(_ => SessionKey);
 
+        this.typeNameProvider = new TypeNameProvider();
         this.sessionManager = new SessionManager(
-            this.sessionKeyGenerator,
-            this.routeInfoProvider,
-            this.writeConnectorService,
-            sessionInfoService,
+            new SessionCreationRequestHandler(
+                this.routeInfoProvider,
+                this.typeNameProvider,
+                this.sessionKeyGenerator,
+                new PacketWriterHelper(this.writeConnectorService)),
+            new SessionEndingRequestHandler(
+                this.routeInfoProvider,
+                this.typeNameProvider,
+                this.sessionInfoMemoryRepository,
+                new PacketWriterHelper(this.writeConnectorService)),
+            new GetSessionInfoRequestHandler(this.sessionInfoMemoryRepository, this.streamsProvider),
+            new SessionIdentifierUpdateRequestHandler(
+                this.sessionInfoMemoryRepository,
+                this.logger,
+                new PacketWriterHelper(this.writeConnectorService),
+                this.typeNameProvider),
+            new AddAssociateSessionRequestHandler(
+                this.sessionInfoMemoryRepository,
+                this.logger,
+                new PacketWriterHelper(this.writeConnectorService),
+                this.typeNameProvider),
             this.sessionInfoMemoryRepository,
-            cancellationTokenSourceProvider,
-            this.logger,
-            configProvider);
+            configProvider,
+            new SessionNotificationManagerService(
+                sessionInfoService,
+                new NotificationStreamWriterService<GetSessionStartNotificationResponse>(),
+                new NotificationStreamWriterService<GetSessionStopNotificationResponse>()));
     }
 
     [Fact]
@@ -95,8 +122,8 @@ public class SessionManagementServiceShould
         this.sessionKeyGenerator.Received(1).GenerateStringKey();
         this.routeInfoProvider.Received(1).GetRouteInfo(DataSourceName);
         this.writeConnectorService.Received(2).WriteInfoPacket(Arg.Any<WriteInfoPacketRequestDto>());
-        this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == nameof(NewSessionPacket)));
-        this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == nameof(SessionInfoPacket)));
+        this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.NewSessionPacketTypeName));
+        this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName));
     }
 
     [Fact]
@@ -123,7 +150,8 @@ public class SessionManagementServiceShould
         endSessionResponse.EndSession.TopicPartitionOffsets.Keys.Should().BeEquivalentTo(routeInfos.Select(i => $"{i.Topic}:{i.Partition}"));
 
         this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Any<WriteInfoPacketRequestDto>());
-        this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == nameof(EndOfSessionPacket)));
+        this.writeConnectorService.Received(1)
+            .WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.EndOfSessionPacketTypeName));
     }
 
     [Fact]
@@ -256,7 +284,7 @@ public class SessionManagementServiceShould
         this.writeConnectorService.Received(1).WriteInfoPacket(
             Arg.Is<WriteInfoPacketRequestDto>(
                 req =>
-                    req.Message.Type == nameof(SessionInfoPacket)
+                    req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Identifier == NewIdentifier
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Type == Type
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Version == Version
@@ -315,7 +343,7 @@ public class SessionManagementServiceShould
         this.writeConnectorService.Received(1).WriteInfoPacket(
             Arg.Is<WriteInfoPacketRequestDto>(
                 req =>
-                    req.Message.Type == nameof(SessionInfoPacket)
+                    req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Identifier == Identifier
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Type == Type
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Version == Version

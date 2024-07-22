@@ -18,13 +18,17 @@
 using MA.DataPlatform.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core.Routing.EssentialsRouting;
 
 namespace MA.Streaming.Core.Routing;
 
 public class PartitionBasedKafkaRouteInfoProvider : KafkaRouteInfoProvider
 {
-    public PartitionBasedKafkaRouteInfoProvider(IKafkaTopicHelper kafkaTopicHelper, IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
-        : base(kafkaTopicHelper, streamingApiConfigurationProvider)
+    public PartitionBasedKafkaRouteInfoProvider(
+        IKafkaTopicHelper kafkaTopicHelper,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
+        IEssentialTopicNameCreator essentialTopicNameCreator)
+        : base(kafkaTopicHelper, streamingApiConfigurationProvider, essentialTopicNameCreator)
     {
     }
 
@@ -32,46 +36,58 @@ public class PartitionBasedKafkaRouteInfoProvider : KafkaRouteInfoProvider
     {
         var configurationPartitionMappings = this.Configuration.PartitionMappings ?? [];
         return topicInfos.Any()
-            ? ExtractRouteInfos(dataSource, topicInfos, configurationPartitionMappings)
-            : ReturnDefaultRouteInfos(dataSource, configurationPartitionMappings);
+            ? this.ExtractRouteInfos(dataSource, topicInfos, configurationPartitionMappings)
+            : this.ReturnDefaultRouteInfos(dataSource, configurationPartitionMappings);
     }
 
-    private static IReadOnlyList<IRouteInfo> ExtractRouteInfos(
+    private IReadOnlyList<IRouteInfo> ExtractRouteInfos(
         string dataSource,
         IReadOnlyList<TopicInfo> topicInfos,
         IEnumerable<PartitionMapping> configurationPartitionMappings)
     {
-        var mainRouteInfo = CreateKafkaRouteInfo(dataSource, topicInfos);
+        var mainRouteInfo = CreateMainRouteInfo(dataSource, topicInfos);
+        var essentialRoueInfo = this.CreateEssentialRouteInfo(dataSource, topicInfos);
         var result = new List<KafkaRouteInfo>
         {
-            mainRouteInfo
+            mainRouteInfo,
+            essentialRoueInfo,
         };
         result.AddRange(
             configurationPartitionMappings.Select(
-                configurationPartitionMapping => CreateKafkaRouteInfo(dataSource, topicInfos, configurationPartitionMapping)));
+                configurationPartitionMapping => CreateStreamsKafkaRouteInfo(dataSource, topicInfos, configurationPartitionMapping)));
 
         return result;
     }
 
-    private static KafkaRouteInfo CreateKafkaRouteInfo(
+    private static KafkaRouteInfo CreateMainRouteInfo(string dataSource, IEnumerable<TopicInfo> topicInfos)
+    {
+        var mainTopicInfo = topicInfos.FirstOrDefault(i => i.TopicName == dataSource && i.Partition == 0);
+        return mainTopicInfo == null
+            ? new KafkaRouteInfo(CreateRouteName(dataSource, string.Empty), dataSource, 0, 0, dataSource)
+            : new KafkaRouteInfo(CreateRouteName(dataSource, string.Empty), dataSource, 0, mainTopicInfo.Offset, dataSource);
+    }
+
+    private static KafkaRouteInfo CreateStreamsKafkaRouteInfo(
         string dataSource,
         IEnumerable<TopicInfo> topicInfos,
-        PartitionMapping? partitionMapping = null)
+        PartitionMapping partitionMapping)
     {
-        var partitionNumber = (partitionMapping?.Partition ?? 0);
-        var topicInfo = topicInfos.FirstOrDefault(i => i.Partition == partitionNumber);
+        var topicInfo = topicInfos.FirstOrDefault(i => i.TopicName == dataSource && i.Partition == partitionMapping.Partition);
         var offset = topicInfo?.Offset ?? 0;
-        var routeInfo = new KafkaRouteInfo(dataSource, dataSource, partitionNumber, offset, dataSource, partitionMapping?.Stream ?? "");
+        var stream = partitionMapping.Stream;
+        var routeInfo = new KafkaRouteInfo(CreateRouteName(dataSource, stream), dataSource, partitionMapping.Partition, offset, dataSource, stream);
         return routeInfo;
     }
 
-    private static IReadOnlyList<IRouteInfo> ReturnDefaultRouteInfos(string dataSource, IEnumerable<PartitionMapping> configurationPartitionMappings)
+    private IReadOnlyList<IRouteInfo> ReturnDefaultRouteInfos(string dataSource, IEnumerable<PartitionMapping> configurationPartitionMappings)
     {
         var result = new List<KafkaRouteInfo>
         {
-            new(dataSource, dataSource, 0, 0, dataSource)
+            new(dataSource, dataSource, 0, 0, dataSource),
+            this.CreateEssentialRouteInfo(dataSource, []),
         };
-        result.AddRange(configurationPartitionMappings.Select(i => new KafkaRouteInfo($"{dataSource}.{i.Stream}", dataSource, i.Partition, 0, dataSource, i.Stream)));
+        result.AddRange(
+            configurationPartitionMappings.Select(i => new KafkaRouteInfo(CreateRouteName(dataSource, i.Stream), dataSource, i.Partition, 0, dataSource, i.Stream)));
 
         return result;
     }

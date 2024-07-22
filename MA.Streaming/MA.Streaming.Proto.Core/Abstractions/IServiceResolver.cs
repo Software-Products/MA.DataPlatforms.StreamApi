@@ -15,10 +15,9 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Proto.Core.Abstractions
+namespace MA.Streaming.Proto.Core.Abstractions;
+
+public interface IServiceResolver
 {
-    public interface IServiceResolver
-    {
-        T? Resolve<T>();
-    }
+    T? Resolve<T>();
 }

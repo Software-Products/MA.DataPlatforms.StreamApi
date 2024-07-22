@@ -17,40 +17,39 @@
 
 using Confluent.Kafka;
 
-namespace MA.Streaming.Proto.Core
-{
-    internal class KafkaBrokerAvailabilityChecker
-    {
-        public bool Check(string brokerUrl)
-        {
-            return IsBrokerAvailable(brokerUrl);
-        }
+namespace MA.Streaming.Proto.Core;
 
-        private static bool IsBrokerAvailable(string brokerUrl)
+internal class KafkaBrokerAvailabilityChecker
+{
+    public bool Check(string brokerUrl)
+    {
+        return IsBrokerAvailable(brokerUrl);
+    }
+
+    private static bool IsBrokerAvailable(string brokerUrl)
+    {
+        try
         {
-            try
+            var config = new AdminClientConfig
             {
-                var config = new AdminClientConfig
-                {
-                    BootstrapServers = brokerUrl
-                };
-                using var adminClient = new AdminClientBuilder(config).Build();
-                var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
-                if (metadata.Brokers.Count > 0)
-                {
-                    Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
-                    return true;
-                }
-                else
-                {
-                    Console.WriteLine("Kafka broker is not available. Retrying in 5 seconds...");
-                    return false;
-                }
+                BootstrapServers = brokerUrl
+            };
+            using var adminClient = new AdminClientBuilder(config).Build();
+            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
+            if (metadata.Brokers.Count > 0)
+            {
+                Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
+                return true;
             }
-            catch (Exception)
+            else
             {
+                Console.WriteLine("Kafka broker is not available. Retrying in 5 seconds...");
                 return false;
             }
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 }

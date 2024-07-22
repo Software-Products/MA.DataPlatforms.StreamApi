@@ -98,7 +98,7 @@ public sealed class Server : IServer
             {
                 logging.ClearProviders();
                 logging.SetMinimumLevel(LogLevel.Warning);
-                logging.AddConsole();   
+                logging.AddConsole();
             });
 
         builder.Services.AddGrpc();
@@ -126,10 +126,11 @@ public sealed class Server : IServer
         if (this.streamingApiConfiguration.IntegrateSessionManagement)
         {
             this.webApp.Services.GetService<ISessionInfoService>()?.Start();
+            this.webApp.Services.GetService<ISessionNotificationManagerService>()?.Start();
         }
 
         this.metricServer = new MetricServer(this.streamingApiConfiguration.PrometheusMetricPort);
-        metricServer.Start();
+        this.metricServer.Start();
 
         return this.webApp.StartAsync();
     }
