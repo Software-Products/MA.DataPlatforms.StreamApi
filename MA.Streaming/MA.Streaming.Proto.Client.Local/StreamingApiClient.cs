@@ -38,7 +38,8 @@ public static class StreamingApiClient
     public static void Initialise(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
-        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker)
+        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
+        ILoggingDirectoryProvider loggingDirectoryProvider)
     {
         if (Initialised)
         {
@@ -47,7 +48,7 @@ public static class StreamingApiClient
 
         try
         {
-            server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker);
+            server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker, loggingDirectoryProvider);
             server.Start().Wait(TimeSpan.FromSeconds(10));
             channel = GrpcChannel.ForAddress(
                 $"http://localhost:{streamingApiConfiguration.StreamApiPort}",
@@ -82,7 +83,6 @@ public static class StreamingApiClient
         channel = null;
         server?.Dispose();
         server = null;
-
         Initialised = false;
     }
 

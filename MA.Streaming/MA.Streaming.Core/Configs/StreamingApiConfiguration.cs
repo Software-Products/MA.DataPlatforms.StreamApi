@@ -30,14 +30,12 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         bool integrateDataFormatManagement = true,
         bool useRemoteKeyGenerator = false,
         string remoteKeyGeneratorServiceAddress = "",
-        bool batchingResponses = false,
-        int prometheusMetricPort = 10010)
+        bool batchingResponses = false)
     {
         this.StreamCreationStrategy = streamCreationStrategy;
         this.BrokerUrl = brokerUrl;
         this.PartitionMappings = partitionMappings;
         this.BatchingResponses = batchingResponses;
-        this.PrometheusMetricPort = prometheusMetricPort;
         this.RemoteKeyGeneratorServiceAddress = remoteKeyGeneratorServiceAddress;
         this.UseRemoteKeyGenerator = useRemoteKeyGenerator;
         this.StreamApiPort = streamApiPort;
@@ -62,6 +60,4 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
     public string RemoteKeyGeneratorServiceAddress { get; }
 
     public bool BatchingResponses { get; }
-
-    public int PrometheusMetricPort { get; }
 }

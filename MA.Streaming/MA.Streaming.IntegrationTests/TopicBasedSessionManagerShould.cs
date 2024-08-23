@@ -23,6 +23,7 @@ using Google.Protobuf.Collections;
 using MA.DataPlatform.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
 using MA.Streaming.IntegrationTests.Base;
@@ -157,7 +158,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
                     integrateDataFormatManagement: false,
                     integrateSessionManagement: true));
 
-        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker());
+        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
         this.sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
         new AutoResetEvent(false).WaitOne(5000);
     }

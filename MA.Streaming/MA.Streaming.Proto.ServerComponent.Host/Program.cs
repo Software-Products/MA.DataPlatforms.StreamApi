@@ -17,6 +17,8 @@
 
 using System.Net;
 
+using Prometheus;
+
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
 internal static class Program
@@ -37,10 +39,10 @@ internal static class Program
 
         if (!AppDefinition.AutoStart)
         {
-            var listener = CreateListener(AppDefinition.ListenerListenerPortNumber);
+            var listener = CreateListener(AppDefinition.ListenerPortNumber);
 
             Console.WriteLine(
-                $"environment variables -> port:{AppDefinition.ListenerListenerPortNumber} Config Path:{AppDefinition.StreamApiConfigFilePath}");
+                $"environment variables -> port:{AppDefinition.ListenerPortNumber} Config Path:{AppDefinition.StreamApiConfigFilePath}");
 
             Console.WriteLine("Listening for requests...");
 
@@ -61,6 +63,21 @@ internal static class Program
             Console.WriteLine("Auto Start Enabled...");
             Console.WriteLine("Starting The Server...");
             ServerStarter.Start();
+        }
+
+        try
+        {
+            if (!int.TryParse(AppDefinition.PrometheusMetricPort, out var promPort))
+            {
+                promPort = 10010;
+            }
+
+            var metricServer = new MetricServer(promPort);
+            metricServer.Start();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
         }
 
         autoResetEvent.WaitOne();

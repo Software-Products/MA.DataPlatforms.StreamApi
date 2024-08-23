@@ -26,7 +26,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using Prometheus;
+using ILogger = MA.Common.Abstractions.ILogger;
 
 namespace MA.Streaming.Proto.ServerComponent;
 
@@ -36,24 +36,24 @@ public sealed class Server : IServer
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker;
+    private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
     private readonly object locker = new();
     private WebApplication? webApp;
-    private MetricServer? metricServer;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
-        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker)
+        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
+        ILoggingDirectoryProvider loggingDirectoryProvider)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.kafkaBrokerAvailabilityChecker = kafkaBrokerAvailabilityChecker;
+        this.loggingDirectoryProvider = loggingDirectoryProvider;
     }
 
     public void Dispose()
     {
-        this.metricServer?.Stop();
-        this.metricServer?.Dispose();
         this.Stop().Wait();
     }
 
@@ -62,10 +62,13 @@ public sealed class Server : IServer
         return this.webApp?.Services.GetService(serviceType);
     }
 
-    public Task Start() => this.StartInternal().ContinueWith(
-        tsk => tsk.IsCompletedSuccessfully && this.webApp?.Urls.Count == ExpectedUrlCount
-            ? Task.CompletedTask
-            : throw tsk.Exception ?? new Exception("Start server failed"));
+    public Task Start()
+    {
+        return this.StartInternal().ContinueWith(
+            tsk => tsk.IsCompletedSuccessfully && this.webApp?.Urls.Count == ExpectedUrlCount
+                ? Task.CompletedTask
+                : throw tsk.Exception ?? new Exception("Start server failed"));
+    }
 
     public Task Stop()
     {
@@ -81,11 +84,6 @@ public sealed class Server : IServer
 
     private Task StartInternal()
     {
-        if (!this.kafkaBrokerAvailabilityChecker.Check(this.streamingApiConfiguration.BrokerUrl))
-        {
-            return Task.FromException(new Exception("The Broker is not available"));
-        }
-
         // Create the web app builder
         // This currently uses the port defined in the configuration the default endpoints of http://localhost:5000 
         var builder = WebApplication.CreateBuilder();
@@ -103,7 +101,7 @@ public sealed class Server : IServer
 
         builder.Services.AddGrpc();
         // Add services to the container.
-        new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider).Configure(builder.Services);
+        new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider, this.loggingDirectoryProvider).Configure(builder.Services);
 
         this.webApp = builder.Build();
 
@@ -118,19 +116,32 @@ public sealed class Server : IServer
             () =>
                 "Communication with this gRPC endpoint must be made through a Stream API client.");
 
+        var logger = this.webApp.Services.GetService<ILogger>();
+        var kafkaAvailable = false;
+        while (!kafkaAvailable)
+        {
+            if (this.kafkaBrokerAvailabilityChecker.Check(this.streamingApiConfiguration.BrokerUrl))
+            {
+                kafkaAvailable = true;
+                continue;
+            }
+
+            logger?.Error("Kafka is not available will retry in 5 seconds");
+            Task.Delay(TimeSpan.FromSeconds(5)).Wait();
+        }
+
         if (this.streamingApiConfiguration.IntegrateDataFormatManagement)
         {
             this.webApp.Services.GetService<IDataFormatInfoService>()?.Start();
         }
 
-        if (this.streamingApiConfiguration.IntegrateSessionManagement)
+        if (!this.streamingApiConfiguration.IntegrateSessionManagement)
         {
-            this.webApp.Services.GetService<ISessionInfoService>()?.Start();
-            this.webApp.Services.GetService<ISessionNotificationManagerService>()?.Start();
+            return this.webApp.StartAsync();
         }
 
-        this.metricServer = new MetricServer(this.streamingApiConfiguration.PrometheusMetricPort);
-        this.metricServer.Start();
+        this.webApp.Services.GetService<ISessionInfoService>()?.Start();
+        this.webApp.Services.GetService<ISessionNotificationManagerService>()?.Start();
 
         return this.webApp.StartAsync();
     }

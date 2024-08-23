@@ -22,11 +22,11 @@ internal static class AppDefinition
     private static string listenerPortNumber = "";
     private static string prometheusMetricPort = "";
     private static string streamApiConfigFilePath = "";
-    private static bool autoStart = false;
+    private static bool autoStart;
 
     private static bool isLoaded;
 
-    public static string ListenerListenerPortNumber
+    public static string ListenerPortNumber
     {
         get
         {

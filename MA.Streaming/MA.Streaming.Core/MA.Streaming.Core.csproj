@@ -14,12 +14,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MA.DataPlatform.Secu4.KafkaMetadataComponent" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouterComponent" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouteReaderComponent" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouteSubscriberComponent" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Shared" Version="1.1.3.1" />
+    <PackageReference Include="MA.DataPlatform.Secu4.KafkaMetadataComponent" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouterComponent" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouteReaderComponent" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.RouteSubscriberComponent" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Shared" Version="*" />
   </ItemGroup>
 
 	<ItemGroup>

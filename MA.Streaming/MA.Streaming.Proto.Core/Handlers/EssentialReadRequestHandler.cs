@@ -33,9 +33,9 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler
     private readonly IEssentialPacketsReaderConnectorService essentialPacketsReaderConnectorService;
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
-    private IServerStreamWriter<ReadEssentialsResponse>? currentResponseStream;
 
     private readonly object writingLock = new();
+    private IServerStreamWriter<ReadEssentialsResponse>? currentResponseStream;
 
     public EssentialReadRequestHandler(
         IEssentialPacketsReaderConnectorService essentialPacketsReaderConnectorService,
@@ -67,10 +67,6 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler
         this.essentialPacketsReaderConnectorService.Start(this.connectionDtoMapper.Map(new ConnectionInfo(request.Connection.Id, connectionDetails)));
 
         autoResetEvent.WaitOne();
-        File.WriteAllText(
-            "essential.txt",
-            $"readCounter={MetricProviders.NumberOfEssentialPacketRead.WithLabels(request.Connection.Id.ToString(), connectionDetails.DataSource).Value}" +
-            $" writeCounter={MetricProviders.NumberOfEssentialPacketDelivered.WithLabels(request.Connection.Id.ToString(), connectionDetails.DataSource).Value} ");
     }
 
     private void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem)
@@ -101,7 +97,6 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler
             catch (Exception ex)
             {
                 this.logger.Error($"exception happened in writing essential packet response using stream writer. exception {ex}");
-                File.AppendAllText("essential_error.txt", ex.ToString());
             }
         }
     }

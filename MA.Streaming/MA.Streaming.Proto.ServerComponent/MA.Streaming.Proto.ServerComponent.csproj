@@ -15,7 +15,7 @@
 	<ItemGroup>
 		<PackageReference Include="Google.Protobuf" Version="3.26.1" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.62.0" />
-		<PackageReference Include="MA.KeyGenerator.Proto.Client" Version="1.0.1.1" />
+		<PackageReference Include="MA.KeyGenerator.Proto.Client" Version="*" />
 	</ItemGroup>
 
 	<ItemGroup>

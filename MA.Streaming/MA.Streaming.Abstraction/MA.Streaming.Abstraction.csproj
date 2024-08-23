@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MA.Common" Version="1.1.3.1" />
-    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="1.1.3.1" />
+    <PackageReference Include="MA.Common" Version="*" />
+    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="*" />
   </ItemGroup>
 
   <ItemGroup>

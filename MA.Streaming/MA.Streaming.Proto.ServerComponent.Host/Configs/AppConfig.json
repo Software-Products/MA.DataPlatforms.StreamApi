@@ -13,8 +13,8 @@
   ],
   "IntegrateSessionManagement": true,
   "IntegrateDataFormatManagement": true,
-  "UseRemoteKeyGenerator": true,
-  "RemoteKeyGeneratorServiceAddress": "localhost:15379",
-  "BatchingResponses": true,
+  "UseRemoteKeyGenerator": false,
+  "RemoteKeyGeneratorServiceAddress": "",
+  "BatchingResponses": false,
   "StreamApiPort": 13579
 }
