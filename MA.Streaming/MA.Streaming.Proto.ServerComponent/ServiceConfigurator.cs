@@ -46,13 +46,16 @@ public class ServiceConfigurator
 {
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+    private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
 
     public ServiceConfigurator(
         IStreamingApiConfiguration streamingApiConfiguration,
-        ICancellationTokenSourceProvider cancellationTokenSourceProvider)
+        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
+        ILoggingDirectoryProvider loggingDirectoryProvider)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+        this.loggingDirectoryProvider = loggingDirectoryProvider;
     }
 
     public void Configure(IServiceCollection serviceCollection)
@@ -88,6 +91,7 @@ public class ServiceConfigurator
             .AddSingleton<INotificationStreamWriterService<GetSessionStopNotificationResponse>,
                 NotificationStreamWriterService<GetSessionStopNotificationResponse>>();
 
+        serviceCollection.AddTransient(_ => this.loggingDirectoryProvider);
         serviceCollection.AddTransient<ISessionCreationRequestHandler, SessionCreationRequestHandler>();
         serviceCollection.AddTransient<ISessionEndingRequestHandler, SessionEndingRequestHandler>();
         serviceCollection.AddTransient<IAddAssociateSessionRequestHandler, AddAssociateSessionRequestHandler>();

@@ -19,6 +19,7 @@ using FluentAssertions;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
+using MA.Streaming.Core;
 using MA.Streaming.IntegrationTests.Base;
 using MA.Streaming.Proto.Client.Local;
 
@@ -32,18 +33,19 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
 {
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
     private readonly IKafkaBrokerAvailabilityChecker kafkaChecker;
+    private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
 
     public ClientShould(StreamApiTestsCleanUpFixture _)
     {
         // Ensure each test run starts from as "clean" a state as possible
         StreamingApiClient.Shutdown();
         this.streamingApiConfiguration = Substitute.For<IStreamingApiConfiguration>();
+        this.loggingDirectoryProvider = new LoggingDirectoryProvider("");
         this.streamingApiConfiguration.BrokerUrl.Returns("localhost:9097");
         this.streamingApiConfiguration.StreamApiPort.Returns(5000);
         this.streamingApiConfiguration.IntegrateDataFormatManagement.Returns(false);
         this.streamingApiConfiguration.IntegrateSessionManagement.Returns(false);
         this.streamingApiConfiguration.StreamCreationStrategy.Returns(StreamCreationStrategy.PartitionBased);
-        this.streamingApiConfiguration.PrometheusMetricPort.Returns(10010);
         this.kafkaChecker = Substitute.For<IKafkaBrokerAvailabilityChecker>();
         this.kafkaChecker.Check(Arg.Any<string>()).Returns(true);
     }
@@ -53,7 +55,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     {
         // Arrange
         // Act
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Assert
         StreamingApiClient.Initialised.Should().BeTrue();
     }
@@ -62,7 +68,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void NotBeInitialisedAfterShutdown()
     {
         // Arrange
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Act
         StreamingApiClient.Shutdown();
         // Assert
@@ -82,7 +92,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void ReturnClientIfGetConnectionManagerClientCalled()
     {
         // Arrange
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Act
         var client = StreamingApiClient.GetConnectionManagerClient();
         // Assert
@@ -93,7 +107,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void ReturnClientIfGetDataFormatManagerClientCalled()
     {
         // Arrange
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Act
         var client = StreamingApiClient.GetDataFormatManagerClient();
         // Assert
@@ -104,7 +122,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void ReturnClientIfGetPacketReaderClientCalled()
     {
         // Arrange
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Act
         var client = StreamingApiClient.GetPacketReaderClient();
         // Assert
@@ -115,7 +137,11 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void ReturnClientIfGetPacketWriterClientCalled()
     {
         // Arrange
-        StreamingApiClient.Initialise(this.streamingApiConfiguration, Substitute.For<ICancellationTokenSourceProvider>(), this.kafkaChecker);
+        StreamingApiClient.Initialise(
+            this.streamingApiConfiguration,
+            Substitute.For<ICancellationTokenSourceProvider>(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider);
         // Act
         var client = StreamingApiClient.GetPacketWriterClient();
         // Assert

@@ -25,6 +25,7 @@ using Grpc.Core;
 
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
 using MA.Streaming.IntegrationTests.Base;
@@ -77,7 +78,7 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             integrateSessionManagement: false,
             batchingResponses: false);
         var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
-        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker());
+        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
         packetWriter = StreamingApiClient.GetPacketWriterClient();
         packetReader = StreamingApiClient.GetPacketReaderClient();
         receiveConnection = StreamingApiClient.GetConnectionManagerClient().NewConnection(

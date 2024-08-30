@@ -17,6 +17,7 @@
 
 using System.Text.Json;
 
+using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
 
@@ -47,7 +48,8 @@ internal static class ServerStarter
                     return;
                 }
 
-                var server = new Server(config, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker());
+
+                var server = new Server(config, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
                 _ = Task.Run(
                     async () =>
                     {

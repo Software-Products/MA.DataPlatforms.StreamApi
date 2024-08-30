@@ -16,7 +16,6 @@
 // </copyright>
 
 using MA.Streaming.API;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.Proto.Client.Remote;
 
 namespace MA.Streaming.TestClient;
@@ -25,10 +24,9 @@ internal static class TestClient
 {
     public static void Main(string[] args)
     {
-        var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
         RemoteStreamingApiClient.Initialise("localhost:9092");
 
-        Console.WriteLine($"Initialised StreamingApiClient");
+        Console.WriteLine("Initialised StreamingApiClient");
 
         TestConnection();
 
@@ -36,7 +34,7 @@ internal static class TestClient
 
         Console.ReadLine();
 
-        Console.WriteLine($"Shutdown StreamingApiClient");
+        Console.WriteLine("Shutdown StreamingApiClient");
     }
 
     private static void TestConnection()
@@ -47,7 +45,7 @@ internal static class TestClient
         {
             Details = new ConnectionDetails
             {
-                DataSource = "TestDataSource",
+                DataSource = "TestDataSource"
             }
         };
         var connectionResponse = cmc.NewConnection(newRequest);
@@ -63,7 +61,7 @@ internal static class TestClient
                 }
             });
 
-        Console.WriteLine(getResponse.Details != null ? $"Connection verified" : $"ERROR - connection not found");
+        Console.WriteLine(getResponse.Details != null ? "Connection verified" : "ERROR - connection not found");
 
         var closeResponse = cmc.CloseConnection(
             new CloseConnectionRequest
@@ -74,6 +72,6 @@ internal static class TestClient
                 }
             });
 
-        Console.WriteLine(closeResponse.Success ? $"Connection closed" : $"ERROR - connection not closed");
+        Console.WriteLine(closeResponse.Success ? "Connection closed" : "ERROR - connection not closed");
     }
 }

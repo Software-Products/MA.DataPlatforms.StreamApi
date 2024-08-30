@@ -36,6 +36,4 @@ public interface IStreamingApiConfiguration
     string RemoteKeyGeneratorServiceAddress { get; }
 
     bool BatchingResponses { get; }
-    
-    int PrometheusMetricPort { get; }
 }

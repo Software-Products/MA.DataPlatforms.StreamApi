@@ -22,6 +22,7 @@ using Google.Protobuf;
 using MA.Common;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
 using MA.Streaming.Core.Routing.EssentialsRouting;
@@ -50,7 +51,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
 
     public DataFormatManagerShould(KafkaTestsCleanUpFixture _)
     {
-        var keyGenerator = new KeyGeneratorService();
+        var keyGenerator = new KeyGeneratorService(new LoggingDirectoryProvider(""));
         var essentialTopicNameCreator = new EssentialTopicNameCreator();
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var essentialTopic = essentialTopicNameCreator.Create(DataSource);
@@ -102,7 +103,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
                     integrateDataFormatManagement: true,
                     integrateSessionManagement: false));
 
-        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker());
+        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
         this.dataFormatManagerServiceClient = StreamingApiClient.GetDataFormatManagerClient();
         new AutoResetEvent(false).WaitOne(5000);
     }

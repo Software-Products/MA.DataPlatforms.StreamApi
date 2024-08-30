@@ -91,7 +91,7 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
             this.typeNameProvider,
             logger);
         new KafkaClearHelper(BrokerUrl).Clear().Wait();
-        this.keyGenerator = new KeyGeneratorService();
+        this.keyGenerator = new KeyGeneratorService(new LoggingDirectoryProvider(""));
         this.essentialTopicNameCreator = new EssentialTopicNameCreator();
     }
 
