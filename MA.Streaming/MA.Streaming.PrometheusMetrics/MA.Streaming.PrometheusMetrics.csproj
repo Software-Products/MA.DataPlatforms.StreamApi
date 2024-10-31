@@ -10,6 +10,7 @@
     <Description>Library for providing prometheus metrics for the Stream API </Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

@@ -19,7 +19,7 @@ namespace MA.Streaming.Abstraction;
 
 public interface IDataSourcesRepository
 {
-    public event EventHandler<string> NewTRackingDataSourceAdded;
+    public event EventHandler<string> DataSourceAdded;
 
     public void Initiate();
 

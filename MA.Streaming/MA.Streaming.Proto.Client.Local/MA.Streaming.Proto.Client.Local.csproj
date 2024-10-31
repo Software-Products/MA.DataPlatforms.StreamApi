@@ -10,6 +10,7 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Description>A .NET implementation of the MA Stream API for standalone applications that do not need to connect to a remote gRPC server. The client will instantiate it's own local gRPC server running the Stream API services, without requiring an external Stream API server to be set up.</Description>
     <Authors>McLaren Applied</Authors>
+    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

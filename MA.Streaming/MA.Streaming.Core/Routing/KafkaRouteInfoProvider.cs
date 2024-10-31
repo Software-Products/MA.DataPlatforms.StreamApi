@@ -15,7 +15,7 @@
 // limitations under the License.
 // </copyright>
 
-using MA.DataPlatform.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Routing.EssentialsRouting;

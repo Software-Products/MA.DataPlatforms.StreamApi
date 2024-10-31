@@ -10,12 +10,13 @@
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 		<Description>A .NET implementation of the MA Stream API gRPC server.</Description>
 		<Authors>McLaren Applied</Authors>
-  </PropertyGroup>
+		<RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Google.Protobuf" Version="3.26.1" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.62.0" />
-		<PackageReference Include="MA.KeyGenerator.Proto.Client" Version="*" />
+		<PackageReference Include="MA.KeyGenerator.Proto.Client" Version="1.3.3.30" />
 	</ItemGroup>
 
 	<ItemGroup>

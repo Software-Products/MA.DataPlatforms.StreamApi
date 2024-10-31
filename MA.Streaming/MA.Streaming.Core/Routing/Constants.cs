@@ -19,9 +19,9 @@ namespace MA.Streaming.Core.Routing;
 
 internal static class Constants
 {
-    public const string SessionInfoTopicName = "SesssionInfo";
+    public const string SessionInfoTopicName = "SessionInfo";
     public const string SystemStatusTopicName = "SystemStatus";
-    public const string SessionInfoDataSourceName = "SesssionInfo_Route";
+    public const string SessionInfoDataSourceName = "SessionInfo_Route";
     public const string SystemStatusDataSourceName = "SystemStatus_Route";
     public const string EssentialStreamName = "@stream@::_essential";
     public const string EssentialTopicNameSuffix = "_essential";

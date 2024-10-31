@@ -20,8 +20,8 @@ using FluentAssertions;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 
-using MA.DataPlatform.Secu4.KafkaMetadataComponent;
-using MA.DataPlatform.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Core;

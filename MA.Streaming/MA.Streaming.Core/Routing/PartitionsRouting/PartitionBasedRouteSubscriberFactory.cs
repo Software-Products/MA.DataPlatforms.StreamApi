@@ -16,8 +16,8 @@
 // </copyright>
 
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.RouteSubscriberComponent;
-using MA.DataPlatform.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;

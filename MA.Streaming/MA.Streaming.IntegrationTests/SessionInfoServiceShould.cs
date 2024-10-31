@@ -21,7 +21,7 @@ using Google.Protobuf;
 using Google.Protobuf.Collections;
 
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;

@@ -17,7 +17,7 @@
 
 using MA.Common;
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;

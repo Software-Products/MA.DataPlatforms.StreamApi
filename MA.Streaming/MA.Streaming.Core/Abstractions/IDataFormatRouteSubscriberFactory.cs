@@ -15,8 +15,8 @@
 // limitations under the License.
 // </copyright>
 
-using MA.DataPlatform.Secu4.RouteSubscriberComponent.Abstractions;
-using MA.DataPlatform.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 
 namespace MA.Streaming.Core.Abstractions;
 

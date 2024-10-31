@@ -80,7 +80,7 @@ public class ThreadSafeInMemoryRepository<TKey, TData> : IInMemoryRepository<TKe
         }
     }
 
-    public void RemoveAll(Func<TData, bool>? predicate)
+    public void RemoveAll(Func<TData, bool>? predicate = null)
     {
         this.@lock.EnterWriteLock();
         try
