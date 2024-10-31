@@ -18,8 +18,8 @@
 using System.Collections.Concurrent;
 
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.RouteReaderComponent;
-using MA.DataPlatform.Secu4.RouteReaderComponent.Abstractions;
+using MA.DataPlatforms.Secu4.RouteReaderComponent;
+using MA.DataPlatforms.Secu4.RouteReaderComponent.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 

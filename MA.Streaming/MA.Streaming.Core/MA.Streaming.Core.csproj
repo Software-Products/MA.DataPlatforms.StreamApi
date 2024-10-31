@@ -11,20 +11,19 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 	<Description>MA Stream API core libraries.</Description>
 	<Authors>McLaren Applied</Authors>
+    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MA.DataPlatform.Secu4.KafkaMetadataComponent" Version="*" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouterComponent" Version="*" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouteReaderComponent" Version="*" />
-    <PackageReference Include="MA.DataPlatform.Secu4.RouteSubscriberComponent" Version="*" />
-    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Contracts" Version="*" />
-    <PackageReference Include="MA.DataPlatform.Secu4.Routing.Shared" Version="*" />
-  </ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="MA.Streaming.IntegrationTests" />
 		<InternalsVisibleTo Include="MA.Streaming.UnitTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="MA.DataPlatforms.Secu4.KafkaMetadataComponent" Version="1.3.3.18" />
+	  <PackageReference Include="MA.DataPlatforms.Secu4.RouterComponent" Version="1.3.3.18" />
+	  <PackageReference Include="MA.DataPlatforms.Secu4.RouteReaderComponent" Version="1.3.3.18" />
+	  <PackageReference Include="MA.DataPlatforms.Secu4.RouteSubscriberComponent" Version="1.3.3.18" />
 	</ItemGroup>
 
 	<ItemGroup>

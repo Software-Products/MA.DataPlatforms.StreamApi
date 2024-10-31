@@ -16,9 +16,9 @@
 // </copyright>
 
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.RouterComponent;
-using MA.DataPlatform.Secu4.RouterComponent.Abstractions;
-using MA.DataPlatform.Secu4.RouterComponent.BrokersPublishers.KafkaBroking;
+using MA.DataPlatforms.Secu4.RouterComponent;
+using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
+using MA.DataPlatforms.Secu4.RouterComponent.BrokersPublishers.KafkaBroking;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.Routing.EssentialsRouting;

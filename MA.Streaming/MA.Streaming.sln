@@ -23,29 +23,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MA.Streaming.Proto.Core", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MA.Streaming.Proto.ServerComponent", "MA.Streaming.Proto.ServerComponent\MA.Streaming.Proto.ServerComponent.csproj", "{181CB44D-C954-41AC-9DD2-13228EF2FCB5}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{FBE4CCFB-ACE3-4BDF-947A-2739BB7E14C6}"
-	ProjectSection(SolutionItems) = preProject
-		..\Build\BuildPipeline.yml = ..\Build\BuildPipeline.yml
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "generic-steps", "generic-steps", "{3BBDE47A-D505-4F2F-AF71-5E56EFDA17A3}"
-	ProjectSection(SolutionItems) = preProject
-		..\Build\generic-steps\build-docker-image.yml = ..\Build\generic-steps\build-docker-image.yml
-		..\Build\generic-steps\build-nugets.yml = ..\Build\generic-steps\build-nugets.yml
-		..\Build\generic-steps\build-solution.yml = ..\Build\generic-steps\build-solution.yml
-		..\Build\generic-steps\build-stage.yml = ..\Build\generic-steps\build-stage.yml
-		..\Build\generic-steps\prepare-sonarcloud.yml = ..\Build\generic-steps\prepare-sonarcloud.yml
-		..\Build\generic-steps\prepare-tests.yml = ..\Build\generic-steps\prepare-tests.yml
-		..\Build\generic-steps\publish-artifacts.yml = ..\Build\generic-steps\publish-artifacts.yml
-		..\Build\generic-steps\publish-docker-to-public-dockerhub.yml = ..\Build\generic-steps\publish-docker-to-public-dockerhub.yml
-		..\Build\generic-steps\publish-nuget.yml = ..\Build\generic-steps\publish-nuget.yml
-		..\Build\generic-steps\publish-stage.yml = ..\Build\generic-steps\publish-stage.yml
-		..\Build\generic-steps\run-integration-tests.yml = ..\Build\generic-steps\run-integration-tests.yml
-		..\Build\generic-steps\run-sonarcloud.yml = ..\Build\generic-steps\run-sonarcloud.yml
-		..\Build\generic-steps\run-tests.yml = ..\Build\generic-steps\run-tests.yml
-		..\Build\generic-steps\run-unit-tests.yml = ..\Build\generic-steps\run-unit-tests.yml
-	EndProjectSection
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MA.Streaming.Abstraction", "MA.Streaming.Abstraction\MA.Streaming.Abstraction.csproj", "{5B03BFFC-4BCA-43AF-8652-378F97A97320}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MA.Streaming.Core", "MA.Streaming.Core\MA.Streaming.Core.csproj", "{A8D9F165-DE6E-402E-996A-7B7EB4F401B2}"
@@ -123,7 +100,6 @@ Global
 		{78FF10EC-2634-4025-A03D-63A5AE9488ED} = {9E528D18-7D23-49D5-A84E-8ACD920833E8}
 		{2485AC37-5DF0-4E43-B33C-9F71561C3A67} = {9E528D18-7D23-49D5-A84E-8ACD920833E8}
 		{181CB44D-C954-41AC-9DD2-13228EF2FCB5} = {9E528D18-7D23-49D5-A84E-8ACD920833E8}
-		{3BBDE47A-D505-4F2F-AF71-5E56EFDA17A3} = {FBE4CCFB-ACE3-4BDF-947A-2739BB7E14C6}
 		{5B03BFFC-4BCA-43AF-8652-378F97A97320} = {CED19573-4E32-435B-A1A7-6003A329F4B6}
 		{A8D9F165-DE6E-402E-996A-7B7EB4F401B2} = {CED19573-4E32-435B-A1A7-6003A329F4B6}
 		{DA13E727-AE17-492D-A1D9-8921F32E3579} = {CED19573-4E32-435B-A1A7-6003A329F4B6}

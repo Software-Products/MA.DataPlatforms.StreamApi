@@ -15,7 +15,7 @@
 // limitations under the License.
 // </copyright>
 
-using MA.DataPlatform.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.Routing.EssentialsRouting;
 

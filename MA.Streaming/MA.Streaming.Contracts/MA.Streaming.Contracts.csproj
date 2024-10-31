@@ -10,6 +10,7 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 	<Description>MA Stream API contracts.</Description>
 	<Authors>McLaren Applied</Authors>
+    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
   </PropertyGroup>
 
 </Project>

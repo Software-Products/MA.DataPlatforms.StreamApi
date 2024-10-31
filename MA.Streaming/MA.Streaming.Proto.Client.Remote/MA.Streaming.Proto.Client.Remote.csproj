@@ -9,6 +9,7 @@
 	<Description>A .NET implementation of the MA Stream API for client applications that connect to a remote gRPC server. The client requires an external Stream API server to be set up (for example using the MA Streaming Server docker image), running the Stream API services.</Description>
 	<Authors>McLaren Applied</Authors>
 	<Title>MA.Streaming.Proto.Client.Remote</Title>
+    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

@@ -16,8 +16,8 @@
 // </copyright>
 
 using MA.Common.Abstractions;
-using MA.DataPlatform.Secu4.RouteSubscriberComponent.Abstractions;
-using MA.DataPlatform.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
@@ -88,7 +88,7 @@ public class DataFormatInfoService : IDataFormatInfoService
                 }
 
                 this.CreateRouteSubscriberAndStartsSubscribing(preExistDataSources);
-                this.dataSourcesRepository.NewTRackingDataSourceAdded += this.DataSourcesRepository_NewTRackingDataSourceAdded;
+                this.dataSourcesRepository.DataSourceAdded += this.DataSourcesRepository_DataSourceAdded;
             }
             catch (Exception ex)
             {
@@ -110,7 +110,7 @@ public class DataFormatInfoService : IDataFormatInfoService
         routeSubscriber.Subscribe();
     }
 
-    private void DataSourcesRepository_NewTRackingDataSourceAdded(object? sender, string e)
+    private void DataSourcesRepository_DataSourceAdded(object? sender, string e)
     {
         if (string.IsNullOrEmpty(e))
         {

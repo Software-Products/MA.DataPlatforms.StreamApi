@@ -15,7 +15,7 @@
 // limitations under the License.
 // </copyright>
 
-using MA.DataPlatform.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Routing;
 
@@ -35,7 +35,7 @@ public class DataSourcesRepository : IDataSourcesRepository
         this.streamingApiConfiguration = streamingApiConfigurationProvider.Provide();
     }
 
-    public event EventHandler<string>? NewTRackingDataSourceAdded;
+    public event EventHandler<string>? DataSourceAdded;
 
     public void Initiate()
     {
@@ -71,7 +71,7 @@ public class DataSourcesRepository : IDataSourcesRepository
                 return;
             }
 
-            this.NewTRackingDataSourceAdded?.Invoke(this, dataSource);
+            this.DataSourceAdded?.Invoke(this, dataSource);
         }
     }
 }
