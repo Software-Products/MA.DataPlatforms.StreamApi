@@ -41,7 +41,7 @@ public class PacketReaderConnectorService : IPacketReaderConnectorService
         this.logger = logger;
         this.bindingInfoRepository = bindingInfoRepository;
         this.ConnectionId = connectionDetailsDto.Id;
-        this.sessionKey = connectionDetailsDto.Session;
+        this.sessionKey = connectionDetailsDto.SessionKey;
     }
 
     public event EventHandler<PacketReceivedInfoEventArgs>? PacketReceived;
@@ -89,6 +89,6 @@ public class PacketReaderConnectorService : IPacketReaderConnectorService
 
         this.PacketReceived?.Invoke(
             this,
-            new PacketReceivedInfoEventArgs(this.ConnectionId, bindingInfo.DataSource, bindingInfo.Stream, e.Key ?? string.Empty, e.Message));
+            new PacketReceivedInfoEventArgs(this.ConnectionId, bindingInfo.DataSource, bindingInfo.Stream, e.Key ?? string.Empty, e.SubmitTime, e.Message));
     }
 }

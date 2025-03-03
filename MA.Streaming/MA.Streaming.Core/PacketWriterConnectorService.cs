@@ -65,6 +65,7 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService
                     new RoutingDataPacket(
                         request.PacketBytes,
                         this.routeNameExtractor.Extract(request.DataSource, stream),
+                        DateTime.UtcNow,
                         request.SessionKey));
                 MetricProviders.NumberOfRoutedDataPackets.WithLabels(request.DataSource, stream).Inc();
                 MetricProviders.NumberOfRoutedDataPacketsBytes.WithLabels(request.DataSource, stream).Inc(request.PacketBytes.Length);
@@ -84,6 +85,7 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService
             new RoutingDataPacket(
                 request.PacketBytes,
                 extract,
+                DateTime.UtcNow,
                 request.SessionKey));
     }
 
@@ -97,6 +99,7 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService
                 new RoutingDataPacket(
                     request.PacketBytes,
                     this.routeNameExtractor.Extract(Constants.SessionInfoDataSourceName),
+                    DateTime.UtcNow,
                     request.Message.SessionKey));
             MetricProviders.NumberOfRoutedInfoPackets.WithLabels(request.DataSource).Inc();
             MetricProviders.NumberOfRoutedInfoPacketsBytes.WithLabels(request.DataSource).Inc(request.PacketBytes.Length);

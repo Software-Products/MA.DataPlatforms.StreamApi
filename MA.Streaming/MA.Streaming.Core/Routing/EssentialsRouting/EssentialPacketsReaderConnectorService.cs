@@ -50,7 +50,7 @@ public class EssentialPacketsReaderConnectorService : IEssentialPacketsReaderCon
     public void Start(ConnectionDetailsDto connectionDetailsDto)
     {
         this.connectionId = connectionDetailsDto.Id;
-        this.sessionKey = connectionDetailsDto.Session;
+        this.sessionKey = connectionDetailsDto.SessionKey;
         this.reader = this.essentialRouteReaderFactory.Create(connectionDetailsDto);
         this.reader.PacketReceived += this.Reader_PacketReceived;
         this.reader.ReadingCompleted += this.Reader_ReadingCompleted;
@@ -84,6 +84,8 @@ public class EssentialPacketsReaderConnectorService : IEssentialPacketsReaderCon
             return;
         }
 
-        this.PacketReceived?.Invoke(this, new PacketReceivedInfoEventArgs(this.connectionId, bindingInfo.DataSource, string.Empty, e.Key, e.Message));
+        this.PacketReceived?.Invoke(
+            this,
+            new PacketReceivedInfoEventArgs(this.connectionId, bindingInfo.DataSource, string.Empty, e.Key ?? string.Empty, e.SubmitTime, e.Message));
     }
 }

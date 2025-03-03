@@ -47,12 +47,12 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
     private const string DataSource = "TopicBased_Batched_SampleDataSource";
     private const string SessionKey = " TopicBasedPacketWriteAndBatchReadShould_Session_Key";
     private const string SampleType = "SampleType";
-    private readonly ITestOutputHelper outputHelper;
     private static PacketWriterService.PacketWriterServiceClient? packetWriter;
     private static AsyncServerStreamingCall<ReadPacketsResponse>? receiveStream;
     private static PacketReaderService.PacketReaderServiceClient? packetReader;
     private static NewConnectionResponse? receiveConnection;
     private static bool initialised;
+    private readonly ITestOutputHelper outputHelper;
 
     public TopicBasedPacketWriteAndBatchReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
     {
@@ -67,7 +67,7 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
             BrokerUrl,
             [
                 new PartitionMapping(AppGroup1Stream, 1),
-                new PartitionMapping(AppGroup2Stream, 2),
+                new PartitionMapping(AppGroup2Stream, 2)
             ],
             integrateDataFormatManagement: false,
             integrateSessionManagement: false,
@@ -82,7 +82,7 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -92,7 +92,8 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
         receiveStream = packetReader.ReadPackets(
@@ -593,23 +594,6 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
         receiveCount.Should().Be(1000);
     }
 
-    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
-    {
-        if (packetWriter is null)
-        {
-            throw new InvalidOperationException("test not initialised properly");
-        }
-
-        var publishStopWatch = new Stopwatch();
-        publishStopWatch.Start();
-        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
-        publishStopWatch.Stop();
-        if (log)
-        {
-            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        }
-    }
-
     [Fact]
     public async Task Publish_One_Essential_DataPacket_Read_All_Essentials_Should_Deliver_It_And_Packet_Should_Be_Received_On_Defined_DataSource_Stream_Too()
     {
@@ -667,10 +651,11 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
                 }
             },
             token);
+        startListenerAutoResetEvent.WaitOne();
         await this.WriteDataPacket(writeDataPacketRequest);
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(1));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
-        startListenerAutoResetEvent.WaitOne();
         // Act
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
@@ -682,7 +667,6 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
             lstResult.Add(essentialDataResponse);
         }
 
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         tokenSource.Cancel();
         //Assert
         assertResult.Should().BeTrue();
@@ -780,7 +764,7 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        new AutoResetEvent(false).WaitOne(1000);
+        new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
 
         var lstResult = new List<ReadEssentialsResponse>();
         var connectionResponse = await StreamingApiClient.GetConnectionManagerClient().NewConnectionAsync(
@@ -789,7 +773,7 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -799,14 +783,15 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
 
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
             {
-                Connection = connectionResponse.Connection,
+                Connection = connectionResponse.Connection
             });
 
         while (await result.ResponseStream.MoveNext())
@@ -818,5 +803,22 @@ public class TopicBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTestsC
         //assert
         receiveCount.Should().Be(1000);
         lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1000);
+    }
+
+    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
+    {
+        if (packetWriter is null)
+        {
+            throw new InvalidOperationException("test not initialised properly");
+        }
+
+        var publishStopWatch = new Stopwatch();
+        publishStopWatch.Start();
+        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
+        publishStopWatch.Stop();
+        if (log)
+        {
+            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
+        }
     }
 }

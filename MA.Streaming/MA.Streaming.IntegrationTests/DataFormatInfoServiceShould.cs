@@ -73,8 +73,8 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         var dataFormatRoutesFactory = new DataFormatRoutesFactory(new EssentialTopicNameCreator());
         this.dataSourceRepository = new DataSourcesRepository(new KafkaTopicHelper(), streamingApiConfigurationProvider);
         var dataFormatRouteSubscriberFactory = new DataFormatRouteSubscriberFactory(streamingApiConfigurationProvider, cancellationTokenSourceProvider, logger);
-        this.stringToDataRecordRepository = new ThreadSafeInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>();
-        this.ulongToDataRecordRepository = new ThreadSafeInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>();
+        this.stringToDataRecordRepository = new ThreadSafeInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord>();
+        this.ulongToDataRecordRepository = new ThreadSafeInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord>();
         var datasourceDataFormatsRepository = new ThreadSafeInMemoryRepository<string, List<DataFormatRecord>>();
         var packetDtoFromByteFactory = new PacketDtoFromByteFactory(logger);
         var dataFormatDefinitionPacketDtoFromByteFactory = new DataFormatDefinitionPacketDtoFromByteFactory(logger, new ParameterListKeyIdentifierCreator());

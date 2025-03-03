@@ -82,7 +82,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -92,7 +92,8 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
         receiveStream = packetReader.ReadPackets(
@@ -667,10 +668,12 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
+        startListenerAutoResetEvent.WaitOne();
         await this.WriteDataPacket(writeDataPacketRequest);
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
-        startListenerAutoResetEvent.WaitOne();
+       
         // Act
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
@@ -681,8 +684,6 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         {
             lstResult.Add(essentialDataResponse);
         }
-
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         tokenSource.Cancel();
         //Assert
         assertResult.Should().BeTrue();
@@ -789,7 +790,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,

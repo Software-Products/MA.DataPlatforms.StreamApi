@@ -24,17 +24,19 @@ public class ConnectionDetailsDto
         string dataSource,
         long essentialsOffset,
         long mainOffset,
-        string session,
+        string sessionKey,
         IReadOnlyList<long> streamOffsets,
-        IReadOnlyList<string> streams)
+        IReadOnlyList<string> streams,
+        bool excludeMainStream)
     {
         this.Id = id;
         this.DataSource = dataSource;
         this.EssentialsOffset = essentialsOffset;
         this.MainOffset = mainOffset;
-        this.Session = session;
+        this.SessionKey = sessionKey;
         this.StreamOffsets = streamOffsets;
         this.Streams = streams;
+        this.ExcludeMainStream = excludeMainStream;
     }
 
     public long Id { get; }
@@ -45,9 +47,11 @@ public class ConnectionDetailsDto
 
     public long MainOffset { get; }
 
-    public string Session { get; }
+    public string SessionKey { get; }
 
     public IReadOnlyList<long> StreamOffsets { get; }
 
     public IReadOnlyList<string> Streams { get; }
+
+    public bool ExcludeMainStream { get; }
 }

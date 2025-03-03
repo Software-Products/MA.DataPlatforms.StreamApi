@@ -15,6 +15,8 @@
 // limitations under the License.
 // </copyright>
 
+using Google.Protobuf.WellKnownTypes;
+
 using Grpc.Core;
 
 using MA.Common.Abstractions;
@@ -54,19 +56,23 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler
     {
         var autoResetEvent = new AutoResetEvent(false);
         this.currentResponseStream = responseStream;
-        this.essentialPacketsReaderConnectorService.PacketReceived += (_, e) =>
-        {
-            this.WriteDataToStreamAction(e);
-            MetricProviders.NumberOfEssentialPacketRead.WithLabels(e.ConnectionId.ToString(), e.DataSource).Inc();
-        };
+        this.essentialPacketsReaderConnectorService.PacketReceived += this.EssentialPacketsReaderConnectorService_PacketReceived;
+
         this.essentialPacketsReaderConnectorService.ReadingCompleted += (_, _) =>
         {
+            this.essentialPacketsReaderConnectorService.PacketReceived -= this.EssentialPacketsReaderConnectorService_PacketReceived;
             autoResetEvent.Set();
         };
 
         this.essentialPacketsReaderConnectorService.Start(this.connectionDtoMapper.Map(new ConnectionInfo(request.Connection.Id, connectionDetails)));
 
         autoResetEvent.WaitOne();
+    }
+
+    private void EssentialPacketsReaderConnectorService_PacketReceived(object? sender, PacketReceivedInfoEventArgs e)
+    {
+        this.WriteDataToStreamAction(e);
+        MetricProviders.NumberOfEssentialPacketRead.WithLabels(e.ConnectionId.ToString(), e.DataSource).Inc();
     }
 
     private void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem)
@@ -88,7 +94,8 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler
                             new PacketResponse
                             {
                                 Packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes),
-                                Stream = receivedItem.Stream
+                                Stream = receivedItem.Stream,
+                                SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
                             }
                         }
                     }).Wait();

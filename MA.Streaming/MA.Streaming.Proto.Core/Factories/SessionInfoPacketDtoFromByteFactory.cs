@@ -36,7 +36,7 @@ public class SessionInfoPacketDtoFromByteFactory : IDtoFromByteFactory<SessionIn
         try
         {
             var sessionInfo = SessionInfoPacket.Parser.ParseFrom(content);
-            return new SessionInfoPacketDto(sessionInfo.Type, sessionInfo.Version, sessionInfo.Identifier, sessionInfo.AssociateSessionKeys);
+            return new SessionInfoPacketDto(sessionInfo.Type, sessionInfo.Version, sessionInfo.Identifier, sessionInfo.AssociateSessionKeys, sessionInfo.Details);
         }
         catch (Exception ex)
         {

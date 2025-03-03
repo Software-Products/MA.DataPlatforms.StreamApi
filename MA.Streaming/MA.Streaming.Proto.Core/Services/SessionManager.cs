@@ -31,6 +31,7 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
     private readonly IGetSessionInfoRequestHandler getSessionInfoRequestHandler;
     private readonly ISessionIdentifierUpdateRequestHandler sessionIdentifierUpdateRequestHandler;
     private readonly IAddAssociateSessionRequestHandler requestHandler;
+    private readonly ISessionDetailsUpdateRequestHandler sessionDetailsUpdateRequestHandler;
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository;
     private readonly ISessionNotificationManagerService sessionNotificationManagerService;
 
@@ -42,6 +43,7 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
         IGetSessionInfoRequestHandler getSessionInfoRequestHandler,
         ISessionIdentifierUpdateRequestHandler sessionIdentifierUpdateRequestHandler,
         IAddAssociateSessionRequestHandler requestHandler,
+        ISessionDetailsUpdateRequestHandler sessionDetailsUpdateRequestHandler,
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
         IStreamingApiConfigurationProvider apiConfigurationProvider,
         ISessionNotificationManagerService sessionNotificationManagerService)
@@ -50,6 +52,7 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
         this.sessionEndingRequestHandler = sessionEndingRequestHandler;
         this.getSessionInfoRequestHandler = getSessionInfoRequestHandler;
         this.sessionIdentifierUpdateRequestHandler = sessionIdentifierUpdateRequestHandler;
+        this.sessionDetailsUpdateRequestHandler = sessionDetailsUpdateRequestHandler;
         this.requestHandler = requestHandler;
         this.sessionInfoRepository = sessionInfoRepository;
         this.sessionNotificationManagerService = sessionNotificationManagerService;
@@ -149,5 +152,15 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
         }
 
         return await this.requestHandler.AddAssociateSession(request);
+    }
+
+    public override async Task<UpdateSessionDetailsResponse> UpdateSessionDetails(UpdateSessionDetailsRequest request, ServerCallContext context)
+    {
+        if (!this.enabled)
+        {
+            return new UpdateSessionDetailsResponse();
+        }
+
+        return await this.sessionDetailsUpdateRequestHandler.UpdateSessionDetails(request);
     }
 }

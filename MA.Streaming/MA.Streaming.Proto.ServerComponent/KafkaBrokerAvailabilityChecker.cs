@@ -23,32 +23,82 @@ namespace MA.Streaming.Proto.ServerComponent;
 
 public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
 {
+    private const double TimeoutWaitingForMetadataSeconds = 2;
+    private const double TimeBetweenRetriesSeconds = 5;
+
     public bool Check(string brokerUrl)
     {
-        return IsBrokerAvailable(brokerUrl);
+        var config = new AdminClientConfig
+        {
+            BootstrapServers = brokerUrl,
+        };
+        using var adminClient = new AdminClientBuilder(config).Build();
+
+        var brokerAvailable = IsBrokerAvailable(adminClient);
+
+        if (brokerAvailable)
+        {
+            Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
+        }
+        else
+        {
+            Console.WriteLine("Kafka broker is not available");
+        }
+
+        return brokerAvailable;
     }
 
-    private static bool IsBrokerAvailable(string brokerUrl)
+    public Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource)
+    {
+        return Task.Run(
+            async () =>
+            {
+                var config = new AdminClientConfig
+                {
+                    BootstrapServers = brokerUrl,
+                };
+                using var adminClient = new AdminClientBuilder(config).Build();
+
+                var kafkaAvailable = IsBrokerAvailable(adminClient);
+                while (!cancellationTokenSource.IsCancellationRequested)
+                {
+                    while (kafkaAvailable && !cancellationTokenSource.IsCancellationRequested)
+                    {
+                        if (!IsBrokerAvailable(adminClient))
+                        {
+                            kafkaAvailable = false;
+                            continue;
+                        }
+
+                        await Task.Delay(TimeSpan.FromSeconds(TimeBetweenRetriesSeconds), cancellationTokenSource.Token);
+                    }
+
+                    while (!kafkaAvailable &&
+                           !cancellationTokenSource.IsCancellationRequested)
+                    {
+                        if (IsBrokerAvailable(adminClient))
+                        {
+                            Console.WriteLine("Kafka broker is available again");
+                            kafkaAvailable = true;
+                            continue;
+                        }
+
+                        await Task.Delay(TimeSpan.FromSeconds(TimeBetweenRetriesSeconds), cancellationTokenSource.Token);
+                    }
+                }
+            },
+            cancellationTokenSource.Token);
+    }
+
+    private static bool IsBrokerAvailable(IAdminClient adminClient)
     {
         try
         {
-            var config = new AdminClientConfig
-            {
-                BootstrapServers = brokerUrl,
-            };
-            using var adminClient = new AdminClientBuilder(config).Build();
-            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(2));
-            if (metadata.Brokers.Count <= 0)
-            {
-                return false;
-            }
-
-            Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
-            return true;
+            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(TimeoutWaitingForMetadataSeconds));
+            return metadata.Brokers.Count > 0;
         }
         catch
         {
-            Console.WriteLine("Kafka broker is not available");
             return false;
         }
     }

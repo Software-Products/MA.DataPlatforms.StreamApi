@@ -87,7 +87,7 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -97,7 +97,8 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
         receiveStream = packetReader.ReadPackets(
@@ -736,10 +737,11 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 }
             },
             token);
+        startListenerAutoResetEvent.WaitOne();
         await this.WriteDataPacket(writeDataPacketRequest);
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
-        startListenerAutoResetEvent.WaitOne();
         // Act
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
@@ -750,8 +752,6 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             lstResult.Add(essentialDataResponse);
         }
-
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         tokenSource.Cancel();
         //Assert
         assertResult.Should().BeTrue();
@@ -849,7 +849,7 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        new AutoResetEvent(false).WaitOne(1000);
+        new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
 
         var lstResult = new List<ReadEssentialsResponse>();
         var connectionResponse = await StreamingApiClient.GetConnectionManagerClient().NewConnectionAsync(
@@ -858,7 +858,7 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -868,7 +868,8 @@ public class PartitionBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
 

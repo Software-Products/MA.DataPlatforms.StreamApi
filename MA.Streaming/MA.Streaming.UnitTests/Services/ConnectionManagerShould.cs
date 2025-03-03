@@ -43,7 +43,7 @@ public class ConnectionManagerShould
             Details = new ConnectionDetails
             {
                 DataSource = "DataSource",
-                Session = "12345"
+                SessionKey = "12345"
             }
         };
         MetricProviders.NumberOfConnections.WithLabels(request.Details.DataSource).Set(0);
@@ -67,7 +67,7 @@ public class ConnectionManagerShould
             Details = new ConnectionDetails
             {
                 DataSource = "DataSource",
-                Session = "12345"
+                SessionKey = "12345"
             }
         };
 
@@ -100,7 +100,7 @@ public class ConnectionManagerShould
             Details = new ConnectionDetails
             {
                 DataSource = "DataSource",
-                Session = "12345"
+                SessionKey = "12345"
             }
         };
 
@@ -133,7 +133,7 @@ public class ConnectionManagerShould
             Details = new ConnectionDetails
             {
                 DataSource = "DataSource",
-                Session = "12345"
+                SessionKey = "12345"
             }
         };
         MetricProviders.NumberOfConnections.WithLabels(newRequest.Details.DataSource).Set(0);
@@ -179,7 +179,7 @@ public class ConnectionManagerShould
             Details = new ConnectionDetails
             {
                 DataSource = "DataSource",
-                Session = "12345"
+                SessionKey = "12345"
             }
         };
         MetricProviders.NumberOfConnections.WithLabels(newRequest.Details.DataSource).Set(0);

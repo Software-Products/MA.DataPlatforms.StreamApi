@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MA.Common" Version="1.3.3.13" />
+    <PackageReference Include="MA.Common" Version="1.3.4.13" />
   </ItemGroup>
 
   <ItemGroup>

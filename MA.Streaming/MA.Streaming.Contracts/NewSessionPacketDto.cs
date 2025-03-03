@@ -23,9 +23,13 @@ public class NewSessionPacketDto
 
     public readonly IReadOnlyList<TopicPartitionOffsetDto> TopicOffsetsPartitions;
 
-    public NewSessionPacketDto(string dataSource, IReadOnlyList<TopicPartitionOffsetDto> topicOffsetsPartitions)
+    public readonly TimeSpan OffsetFromUtc;
+
+
+    public NewSessionPacketDto(string dataSource, IReadOnlyList<TopicPartitionOffsetDto> topicOffsetsPartitions, TimeSpan offsetFromUtc)
     {
         this.DataSource = dataSource;
         this.TopicOffsetsPartitions = topicOffsetsPartitions;
+        this.OffsetFromUtc = offsetFromUtc;
     }
 }
