@@ -37,19 +37,24 @@ public sealed class Server : IServer
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker;
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
+    private readonly bool registerServices;
     private readonly object locker = new();
     private WebApplication? webApp;
+
+    private CancellationTokenSource? availabilityCheckerTokenSource;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
-        ILoggingDirectoryProvider loggingDirectoryProvider)
+        ILoggingDirectoryProvider loggingDirectoryProvider,
+        bool registerServices = false)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.kafkaBrokerAvailabilityChecker = kafkaBrokerAvailabilityChecker;
         this.loggingDirectoryProvider = loggingDirectoryProvider;
+        this.registerServices = registerServices;
     }
 
     public void Dispose()
@@ -72,6 +77,8 @@ public sealed class Server : IServer
 
     public Task Stop()
     {
+        this.availabilityCheckerTokenSource?.Cancel();
+
         WebApplication? webAppCopy;
         lock (this.locker)
         {
@@ -100,6 +107,16 @@ public sealed class Server : IServer
             });
 
         builder.Services.AddGrpc();
+       
+        if (this.registerServices)
+        {
+            builder.Services.AddTransient<ConnectionManager>();
+            builder.Services.AddTransient<DataFormatManager>();
+            builder.Services.AddTransient<PacketWriter>();
+            builder.Services.AddTransient<PacketReader>();
+            builder.Services.AddTransient<SessionManager>();
+        }
+
         // Add services to the container.
         new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider, this.loggingDirectoryProvider).Configure(builder.Services);
 

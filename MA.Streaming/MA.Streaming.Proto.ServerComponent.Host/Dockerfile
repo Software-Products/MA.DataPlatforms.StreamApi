@@ -13,8 +13,10 @@ COPY ["MA.Streaming.Abstraction/MA.Streaming.Abstraction.csproj", "MA.Streaming.
 COPY ["MA.Streaming.Contracts/MA.Streaming.Contracts.csproj", "MA.Streaming.Contracts/"]
 COPY ["MA.Streaming.Core/MA.Streaming.Core.csproj", "MA.Streaming.Core/"]
 
+ARG NUGET_URL
+ARG NUGET_UN
 ARG NUGET_PAT
-RUN dotnet nuget add source "https://nuget.pkg.github.com/mat-docs/index.json" --name MA --username "docker" --password "$NUGET_PAT" --store-password-in-clear-text
+RUN dotnet nuget add source "$NUGET_URL" --name nuget_feed --username "$NUGET_UN" --password "$NUGET_PAT" --store-password-in-clear-text
 
 RUN dotnet restore "./MA.Streaming.Proto.ServerComponent.Host/MA.Streaming.Proto.ServerComponent.Host.csproj"
 COPY . .

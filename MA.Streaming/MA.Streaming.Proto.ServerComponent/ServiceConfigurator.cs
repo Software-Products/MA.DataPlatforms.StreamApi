@@ -78,11 +78,11 @@ public class ServiceConfigurator
                 ThreadSafeInMemoryRepository<long, IReadPacketResponseStreamWriterHandler>>();
 
         serviceCollection
-            .AddSingleton<IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>,
-                ThreadSafeInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord>>();
+            .AddSingleton<IInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord>,
+                ThreadSafeInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord>>();
         serviceCollection
-            .AddSingleton<IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>,
-                ThreadSafeInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord>>();
+            .AddSingleton<IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord>,
+                ThreadSafeInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord>>();
 
         serviceCollection
             .AddSingleton<INotificationStreamWriterService<GetSessionStartNotificationResponse>,
@@ -96,6 +96,7 @@ public class ServiceConfigurator
         serviceCollection.AddTransient<ISessionEndingRequestHandler, SessionEndingRequestHandler>();
         serviceCollection.AddTransient<IAddAssociateSessionRequestHandler, AddAssociateSessionRequestHandler>();
         serviceCollection.AddTransient<ISessionIdentifierUpdateRequestHandler, SessionIdentifierUpdateRequestHandler>();
+        serviceCollection.AddTransient<ISessionDetailsUpdateRequestHandler, SessionDetailsUpdateRequestHandler>();
         serviceCollection.AddTransient<IGetSessionInfoRequestHandler, GetSessionInfoRequestHandler>();
         serviceCollection.AddTransient<IPacketWriterHelper, PacketWriterHelper>();
         serviceCollection.AddTransient<IMapper<Packet, PacketDto>, PacketDtoMapper>();

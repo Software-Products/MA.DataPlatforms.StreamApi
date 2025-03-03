@@ -31,8 +31,8 @@ public class DataFormatInfoService : IDataFormatInfoService
     private readonly IDataSourcesRepository dataSourcesRepository;
     private readonly IDataFormatRouteSubscriberFactory dataFormatRouteSubscriberFactory;
     private readonly IInMemoryRepository<string, List<DataFormatRecord>> dataSourceDataFormatsRepository;
-    private readonly IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord> stringToDataRecordRepository;
-    private readonly IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> ulongIdToDataRecordRepository;
+    private readonly IInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord> stringToDataRecordRepository;
+    private readonly IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> ulongIdToDataRecordRepository;
     private readonly IDtoFromByteFactory<PacketDto> packetDtoFromByteFactory;
     private readonly IDtoFromByteFactory<DataFormatDefinitionPacketDto> dataFormatDefinitionPacketFromByteFactory;
     private readonly ILogger logger;
@@ -46,8 +46,8 @@ public class DataFormatInfoService : IDataFormatInfoService
         IDataFormatRoutesFactory dataFormatRoutesFactory,
         IDataSourcesRepository dataSourcesRepository,
         IDataFormatRouteSubscriberFactory dataFormatRouteSubscriberFactory,
-        IInMemoryRepository<ValueTuple<string, string, DataFormatTypeDto>, DataFormatRecord> stringToDataRecordRepository,
-        IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> ulongIdToDataRecordRepository,
+        IInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord> stringToDataRecordRepository,
+        IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> ulongIdToDataRecordRepository,
         IInMemoryRepository<string, List<DataFormatRecord>> dataSourceDataFormatsRepository,
         IDtoFromByteFactory<PacketDto> packetDtoFromByteFactory,
         IDtoFromByteFactory<DataFormatDefinitionPacketDto> dataFormatDefinitionPacketFromByteFactory,
@@ -158,16 +158,6 @@ public class DataFormatInfoService : IDataFormatInfoService
     private PacketDto? GetPacket(RoutingDataPacket e)
     {
         var packet = this.packetDtoFromByteFactory.ToDto(e.Message);
-        if (packet is null)
-        {
-            return null;
-        }
-
-        if (packet.Type != this.dataFormatDefinitionPacketTypeName)
-        {
-            this.logger.Warning($"the logic for type {packet.Type} is not implemented yet.");
-        }
-
         return packet;
     }
 
@@ -179,7 +169,7 @@ public class DataFormatInfoService : IDataFormatInfoService
             return;
         }
 
-        var stringValueTupleKey = new ValueTuple<string, string, DataFormatTypeDto>(
+        var stringValueTupleKey = (
             dataSource,
             dataFormatDefinitionPacketDto.ContentIdentifiersKey,
             dataFormatDefinitionPacketDto.DataFormatTypeDto);
@@ -211,7 +201,7 @@ public class DataFormatInfoService : IDataFormatInfoService
             }
         }
 
-        var ulongValueTupleKey = new ValueTuple<string, ulong, DataFormatTypeDto>(
+        var ulongValueTupleKey = (
             dataSource,
             dataFormatDefinitionPacketDto.Identifier,
             dataFormatDefinitionPacketDto.DataFormatTypeDto);

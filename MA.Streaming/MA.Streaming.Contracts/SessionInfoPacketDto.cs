@@ -23,12 +23,14 @@ public class SessionInfoPacketDto
     public readonly uint Version;
     public readonly string Identifier;
     public readonly IReadOnlyList<string> AssociatedKeys;
+    public readonly IReadOnlyDictionary<string, string> Details;
 
-    public SessionInfoPacketDto(string type, uint version, string identifier, IReadOnlyList<string> associatedKeys)
+    public SessionInfoPacketDto(string type, uint version, string identifier, IReadOnlyList<string> associatedKeys, IReadOnlyDictionary<string, string> details)
     {
         this.Type = type;
         this.Version = version;
         this.Identifier = identifier;
         this.AssociatedKeys = associatedKeys;
+        this.Details = details;
     }
 }

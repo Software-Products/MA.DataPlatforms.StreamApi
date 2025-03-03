@@ -19,12 +19,13 @@ namespace MA.Streaming.Abstraction;
 
 public class PacketReceivedInfoEventArgs : EventArgs
 {
-    public PacketReceivedInfoEventArgs(long connectionId, string dataSource, string stream, string sessionKey, byte[] messageBytes)
+    public PacketReceivedInfoEventArgs(long connectionId, string dataSource, string stream, string sessionKey, DateTime submitTime, byte[] messageBytes)
     {
         this.ConnectionId = connectionId;
         this.DataSource = dataSource;
         this.Stream = stream;
         this.SessionKey = sessionKey;
+        this.SubmitTime = submitTime;
         this.MessageBytes = messageBytes;
     }
 
@@ -35,6 +36,8 @@ public class PacketReceivedInfoEventArgs : EventArgs
     public string Stream { get; }
 
     public string SessionKey { get; }
+
+    public DateTime SubmitTime { get; }
 
     public byte[] MessageBytes { get; }
 }

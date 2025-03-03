@@ -102,7 +102,8 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
             TopicPartitionOffsets =
             {
                 topicPartitionOffsets
-            }
+            },
+            UtcOffset = request.UtcOffset
         };
         return newSessionPacket;
     }

@@ -29,8 +29,9 @@ public class ConnectionDetailDtoMapper : IMapper<ConnectionInfo, ConnectionDetai
             source.ConnectionDetails.DataSource,
             source.ConnectionDetails.EssentialsOffset,
             source.ConnectionDetails.MainOffset,
-            source.ConnectionDetails.Session,
+            source.ConnectionDetails.SessionKey,
             source.ConnectionDetails.StreamOffsets,
-            source.ConnectionDetails.Streams);
+            source.ConnectionDetails.Streams,
+            source.ConnectionDetails.ExcludeMainStream);
     }
 }

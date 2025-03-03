@@ -43,17 +43,20 @@ public abstract class BaseConsumingConfigurationProvider : IConsumingConfigurati
         var mainRoute = this.GetMainRoute();
         var partitionMappings = this.StreamApiConfig.PartitionMappings ?? [];
         var mainRoutePartitions = partitionMappings.Any() ? partitionMappings.Max(i => i.Partition) + 1 : 1;
-        var kafkaSubscriptionConfigs = new List<KafkaConsumingConfig>
+        var kafkaSubscriptionConfigs = new List<KafkaConsumingConfig>();
+        if (!this.ConnectionDetailsDto.ExcludeMainStream)
         {
-            new(
-                new KafkaListeningConfig(
-                    this.StreamApiConfig.BrokerUrl,
-                    Guid.NewGuid().ToString(),
-                    AutoOffsetResetMode.FromOffset,
-                    this.ConnectionDetailsDto.MainOffset),
-                mainRoute,
-                new KafkaTopicMetaData(mainRoute.Topic, mainRoutePartitions))
-        };
+            kafkaSubscriptionConfigs.Add(
+                new KafkaConsumingConfig(
+                    new KafkaListeningConfig(
+                        this.StreamApiConfig.BrokerUrl,
+                        Guid.NewGuid().ToString(),
+                        AutoOffsetResetMode.FromOffset,
+                        this.ConnectionDetailsDto.MainOffset),
+                    mainRoute,
+                    new KafkaTopicMetaData(mainRoute.Topic, mainRoutePartitions)));
+        }
+
         this.AddStreamsConfigurations(mainRoute.Topic, mainRoutePartitions, kafkaSubscriptionConfigs);
 
         return new ConsumingConfiguration(

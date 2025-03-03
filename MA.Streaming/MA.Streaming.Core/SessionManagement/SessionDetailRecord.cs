@@ -29,21 +29,24 @@ public class SessionDetailRecord
     public readonly IReadOnlyList<TopicPartitionOffsetDto> StartingOffsetInfo;
     public readonly long MainOffset;
     public readonly long EssentialOffset;
+    public readonly TimeSpan UtcOffset;
 
     public SessionDetailRecord(
         string sessionKey,
         string dataSource,
         IReadOnlyList<TopicPartitionOffsetDto> startingOffsetInfo,
         long mainOffset = 0,
-        long essentialOffset = 0)
+        long essentialOffset = 0,
+        TimeSpan utcOffset = default)
     {
         this.SessionKey = sessionKey;
         this.DataSource = dataSource;
         this.StartingOffsetInfo = startingOffsetInfo;
         this.MainOffset = mainOffset;
         this.EssentialOffset = essentialOffset;
-        this.SessionInfoPacket = new SessionInfoPacketDto("", 0, "", []);
+        this.SessionInfoPacket = new SessionInfoPacketDto("", 0, "", [], new Dictionary<string, string>());
         this.Completed = false;
+        this.UtcOffset = utcOffset;
     }
 
     public SessionInfoPacketDto SessionInfoPacket { get; private set; }

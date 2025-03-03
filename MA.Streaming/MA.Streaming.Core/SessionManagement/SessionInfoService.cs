@@ -36,6 +36,7 @@ public class SessionInfoService : ISessionInfoService
     private readonly IDtoFromByteFactory<NewSessionPacketDto> newSessionDtoFromByteFactory;
     private readonly IDtoFromByteFactory<EndOfSessionPacketDto> endOfSessionDtoFromByteFactory;
     private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
+    private readonly IDataSourcesRepository dataSourcesRepository;
     private readonly IDtoFromByteFactory<SessionInfoPacketDto> sessionInfoDtoFromByteFactory;
 
     private readonly string newSessionPacketTypeName;
@@ -55,7 +56,8 @@ public class SessionInfoService : ISessionInfoService
         IDtoFromByteFactory<NewSessionPacketDto> newSessionDtoFromByteFactory,
         IDtoFromByteFactory<EndOfSessionPacketDto> endOfSessionDtoFromByteFactory,
         ITypeNameProvider typeNameProvider,
-        IEssentialTopicNameCreator essentialTopicNameCreator)
+        IEssentialTopicNameCreator essentialTopicNameCreator,
+        IDataSourcesRepository dataSourcesRepository)
     {
         this.sessionInfoRepository = sessionInfoRepository;
         this.sessionRouteSubscriberFactory = sessionRouteSubscriberFactory;
@@ -65,6 +67,7 @@ public class SessionInfoService : ISessionInfoService
         this.newSessionDtoFromByteFactory = newSessionDtoFromByteFactory;
         this.endOfSessionDtoFromByteFactory = endOfSessionDtoFromByteFactory;
         this.essentialTopicNameCreator = essentialTopicNameCreator;
+        this.dataSourcesRepository = dataSourcesRepository;
         this.newSessionPacketTypeName = typeNameProvider.NewSessionPacketTypeName;
         this.endOfSessionPacketTypeName = typeNameProvider.EndOfSessionPacketTypeName;
         this.sessionInfoPacketTypeName = typeNameProvider.SessionInfoPacketTypeName;
@@ -193,7 +196,12 @@ public class SessionInfoService : ISessionInfoService
         var sessionInfoVersion = sessionInfo.Version > 0 ? sessionInfo.Version : foundItem.SessionInfoPacket.Version;
         var sessionInfoIdentifier = !string.IsNullOrEmpty(sessionInfo.Identifier) ? sessionInfo.Identifier : foundItem.SessionInfoPacket.Identifier;
         var sessionInfoAssociatedIds = sessionInfo.AssociatedKeys.Any() ? sessionInfo.AssociatedKeys : foundItem.SessionInfoPacket.AssociatedKeys;
-        foundItem.SetSessionInfo(new SessionInfoPacketDto(sessionInfoType, sessionInfoVersion, sessionInfoIdentifier, sessionInfoAssociatedIds));
+        var sessionInfoDetails = foundItem.SessionInfoPacket.Details.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        foreach (var newDetail in sessionInfo.Details)
+        {
+            sessionInfoDetails[newDetail.Key] = newDetail.Value;
+        }
+        foundItem.SetSessionInfo(new SessionInfoPacketDto(sessionInfoType, sessionInfoVersion, sessionInfoIdentifier, sessionInfoAssociatedIds, sessionInfoDetails));
         this.SessionUpdated?.Invoke(this, new SessionsInfoChangeEventArg(sessionKey, foundItem.DataSource));
     }
 
@@ -222,7 +230,8 @@ public class SessionInfoService : ISessionInfoService
             .FirstOrDefault(i => i.TopicName == this.essentialTopicNameCreator.Create(newSessionPacket.DataSource) && i.Partition == 0)?.Offset ?? 0;
         this.sessionInfoRepository.AddOrUpdate(
             sessionKey,
-            new SessionDetailRecord(sessionKey, newSessionPacket.DataSource, newSessionPacket.TopicOffsetsPartitions, mainOffset, essentialOffset));
+            new SessionDetailRecord(sessionKey, newSessionPacket.DataSource, newSessionPacket.TopicOffsetsPartitions, mainOffset, essentialOffset, newSessionPacket.OffsetFromUtc));
         this.SessionStarted?.Invoke(this, new SessionsInfoChangeEventArg(sessionKey, newSessionPacket.DataSource));
+        this.dataSourcesRepository.Add(newSessionPacket.DataSource);
     }
 }

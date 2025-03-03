@@ -43,7 +43,8 @@ public class NewSessionPacketDtoFromByteFactory : IDtoFromByteFactory<NewSession
                     {
                         var parseInfo = this.ParseTopicPartition(i.Key);
                         return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
-                    }).ToList());
+                    }).ToList(),
+                newSessionPacket.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero);
         }
         catch (Exception ex)
         {

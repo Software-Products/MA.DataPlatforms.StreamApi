@@ -47,12 +47,12 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
     private const string DataSource = "PartitionBased_Batched_SampleDataSource";
     private const string SessionKey = " PartitionBasedPacketWriteAndBatchReadShould_Session_Key";
     private const string SampleType = "SampleType";
-    private readonly ITestOutputHelper outputHelper;
     private static PacketWriterService.PacketWriterServiceClient? packetWriter;
     private static AsyncServerStreamingCall<ReadPacketsResponse>? receiveStream;
     private static PacketReaderService.PacketReaderServiceClient? packetReader;
     private static NewConnectionResponse? receiveConnection;
     private static bool initialised;
+    private readonly ITestOutputHelper outputHelper;
 
     public PartitionBasedPacketWriteAndBatchReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
     {
@@ -67,7 +67,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
             BrokerUrl,
             [
                 new PartitionMapping(AppGroup1Stream, 1),
-                new PartitionMapping(AppGroup2Stream, 2),
+                new PartitionMapping(AppGroup2Stream, 2)
             ],
             integrateDataFormatManagement: false,
             integrateSessionManagement: false,
@@ -82,7 +82,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -92,7 +92,8 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
         receiveStream = packetReader.ReadPackets(
@@ -657,23 +658,6 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
         receiveCount.Should().Be(1000);
     }
 
-    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
-    {
-        if (packetWriter is null)
-        {
-            throw new InvalidOperationException("test not initialised properly");
-        }
-
-        var publishStopWatch = new Stopwatch();
-        publishStopWatch.Start();
-        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
-        publishStopWatch.Stop();
-        if (log)
-        {
-            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        }
-    }
-
     [Fact]
     public async Task Publish_One_Essential_DataPacket_Read_All_Essentials_Should_Deliver_It_And_Packet_Should_Be_Received_On_Defined_DataSource_Stream_Too()
     {
@@ -731,10 +715,12 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
+        startListenerAutoResetEvent.WaitOne();
         await this.WriteDataPacket(writeDataPacketRequest);
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
-        startListenerAutoResetEvent.WaitOne();
+
         // Act
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
@@ -746,8 +732,8 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
             lstResult.Add(essentialDataResponse);
         }
 
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         tokenSource.Cancel();
+
         //Assert
         assertResult.Should().BeTrue();
         lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1);
@@ -853,7 +839,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    Session = SessionKey,
+                    SessionKey = SessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -863,14 +849,15 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                     {
                         AppGroup1Stream,
                         AppGroup2Stream
-                    }
+                    },
+                    ExcludeMainStream = false
                 }
             });
 
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
             {
-                Connection = connectionResponse.Connection,
+                Connection = connectionResponse.Connection
             });
 
         while (await result.ResponseStream.MoveNext())
@@ -882,5 +869,22 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
         //assert
         receiveCount.Should().Be(1000);
         lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1000);
+    }
+
+    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
+    {
+        if (packetWriter is null)
+        {
+            throw new InvalidOperationException("test not initialised properly");
+        }
+
+        var publishStopWatch = new Stopwatch();
+        publishStopWatch.Start();
+        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
+        publishStopWatch.Stop();
+        if (log)
+        {
+            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
+        }
     }
 }

@@ -25,6 +25,7 @@ using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
+using Google.Protobuf.WellKnownTypes;
 
 namespace MA.Streaming.Proto.Core.Handlers;
 
@@ -117,7 +118,8 @@ public class ReadPacketResponseStreamWriterHandler : IReadPacketResponseStreamWr
                 i => new PacketResponse
                 {
                     Packet = Packet.Parser.ParseFrom(i.MessageBytes),
-                    Stream = i.Stream
+                    Stream = i.Stream,
+                    SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
                 }).ToList();
             await this.responseStream.WriteAsync(
                 new ReadPacketsResponse
@@ -160,7 +162,8 @@ public class ReadPacketResponseStreamWriterHandler : IReadPacketResponseStreamWr
                             new PacketResponse
                             {
                                 Packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes),
-                                Stream = receivedItem.Stream
+                                Stream = receivedItem.Stream,  
+                                SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
                             }
                         }
                     },

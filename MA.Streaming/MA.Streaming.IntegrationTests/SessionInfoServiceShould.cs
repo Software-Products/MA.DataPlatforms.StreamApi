@@ -19,7 +19,9 @@ using FluentAssertions;
 
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
+using MA.Common;
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
@@ -72,6 +74,7 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         var endOfSessionDtoFromByteFactory = new EndOfSessionPacketDtoFromByteFactory(logger);
         var sessionInfoDtoFromByteFactory = new SessionInfoPacketDtoFromByteFactory(logger);
         var essentialTopicNameCreator = new EssentialTopicNameCreator();
+        var datasourceRepository = Substitute.For<IDataSourcesRepository>();
         this.typeNameProvider = new TypeNameProvider();
         this.sessionInfoService = new SessionInfoService(
             this.memoryRepository,
@@ -82,7 +85,8 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
             newSessionDtoFromByteFactory,
             endOfSessionDtoFromByteFactory,
             this.typeNameProvider,
-            essentialTopicNameCreator);
+            essentialTopicNameCreator,
+            datasourceRepository);
         new KafkaClearHelper(BrokerUrl).Clear().Wait();
         Task.Delay(2000).Wait();
     }
@@ -154,7 +158,8 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
             TopicPartitionOffsets =
             {
                 mapField
-            }
+            },
+            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
         };
 
         var sessionInfoPacketName = this.typeNameProvider.SessionInfoPacketTypeName;

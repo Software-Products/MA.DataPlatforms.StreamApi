@@ -17,6 +17,7 @@
 
 using Grpc.Core;
 
+using MA.Common;
 using MA.Streaming.Core;
 using MA.Streaming.Proto.Core.Abstractions;
 

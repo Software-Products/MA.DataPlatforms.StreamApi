@@ -91,6 +91,11 @@ public class SessionManagementServiceShould
                 this.logger,
                 new PacketWriterHelper(this.writeConnectorService),
                 this.typeNameProvider),
+            new SessionDetailsUpdateRequestHandler(
+                this.sessionInfoMemoryRepository,
+                this.logger,
+                new PacketWriterHelper(this.writeConnectorService),
+                this.typeNameProvider),
             this.sessionInfoMemoryRepository,
             configProvider,
             new SessionNotificationManagerService(
@@ -211,8 +216,16 @@ public class SessionManagementServiceShould
         var sessionKey2 = Guid.NewGuid().ToString();
         var sessionDetailRecord1 = new SessionDetailRecord(sessionKey1, DataSourceName, topicPartitionsOffsetInfo);
         var sessionDetailRecord2 = new SessionDetailRecord(sessionKey2, "DataSource2", topicPartitionsOffsetInfo);
-        sessionDetailRecord1.SetSessionInfo(new SessionInfoPacketDto("1", 1, "Id1", ["1.1,1.2,1.3"]));
-        sessionDetailRecord2.SetSessionInfo(new SessionInfoPacketDto("2", 2, "Id2", ["2.1,2.2,2.3"]));
+        var sessionDetails1 = new Dictionary<string, string>
+        {
+            ["DetailName1"] = "DetailValue1"
+        };
+        IReadOnlyDictionary<string, string> sessionDetails2 = new Dictionary<string, string>
+        {
+            ["DetailName2"] = "DetailValue2"
+        };
+        sessionDetailRecord1.SetSessionInfo(new SessionInfoPacketDto("1", 1, "Id1", ["1.1,1.2,1.3"], sessionDetails1));
+        sessionDetailRecord2.SetSessionInfo(new SessionInfoPacketDto("2", 2, "Id2", ["2.1,2.2,2.3"], sessionDetails2));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey1)).Returns(sessionDetailRecord1);
         var request = new GetSessionInfoRequest
         {
@@ -232,6 +245,8 @@ public class SessionManagementServiceShould
             {
                 "1.1,1.2,1.3"
             });
+        getSessionInfoResponse.Details.Keys.Should().BeEquivalentTo(sessionDetails1.Keys);
+        getSessionInfoResponse.Details.Values.Should().BeEquivalentTo(sessionDetails1.Values);
     }
 
     [Fact]
@@ -266,7 +281,8 @@ public class SessionManagementServiceShould
         const string Type = "1";
         const uint Version = 1;
         IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
-        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, "Id1", topicPartitionOffset));
+        IReadOnlyDictionary<string, string> sessionDetails = new Dictionary<string, string>();
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, "Id1", topicPartitionOffset, sessionDetails));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
         const string NewIdentifier = "Id2";
         var request = new UpdateSessionIdentifierRequest
@@ -291,6 +307,69 @@ public class SessionManagementServiceShould
                     && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).AssociateSessionKeys.SequenceEqual(topicPartitionOffset)
             ));
     }
+
+    [Fact]
+    public async Task Log_Error_When_Try_To_Update_Details_For_Unknown_Session_Key()
+    {
+        // Arrange 
+        var sessionKey = Guid.NewGuid().ToString();
+        this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns((SessionDetailRecord?)null);
+        var request = new UpdateSessionDetailsRequest
+        {
+            SessionKey = sessionKey
+        };
+        var context = Substitute.For<ServerCallContext>();
+
+        // Act
+        var updateSessionDetailsResponse = await this.sessionManager.UpdateSessionDetails(request, context);
+
+        // Assert
+        this.logger.Received(1).Error($"Unable to update session details for a session which is not currently registered with the session management service. session key: {sessionKey}");
+        updateSessionDetailsResponse.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Update_Details_When_SessionInfo_Exists()
+    {
+        // Arrange 
+        var routeInfos = CreateRandomRouteInfo(4);
+        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var sessionKey = Guid.NewGuid().ToString();
+        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo);
+        const string Type = "1";
+        const uint Version = 1;
+        const string Identifier = "Id";
+        IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
+        var sessionDetails = new Dictionary<string, string>();
+        sessionDetails["DetailName1"] = "DetailValue1";
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails));
+        this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
+        var request = new UpdateSessionDetailsRequest
+        {
+            SessionKey = sessionKey
+        };
+        request.Details.Add("DetailName1", "UpdateDetailValue1");
+        request.Details.Add("DetailName2", "DetailValue2");
+
+        var context = Substitute.For<ServerCallContext>();
+
+        // Act
+        var updateSessionDetailsResponse = await this.sessionManager.UpdateSessionDetails(request, context);
+
+        // Assert
+        updateSessionDetailsResponse.Success.Should().BeTrue();
+        this.writeConnectorService.Received(1).WriteInfoPacket(
+            Arg.Is<WriteInfoPacketRequestDto>(
+                req =>
+                    req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Identifier == Identifier
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Type == Type
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Version == Version
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).AssociateSessionKeys.SequenceEqual(topicPartitionOffset)
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Details.Keys.SequenceEqual(request.Details.Keys)
+                    && SessionInfoPacket.Parser.ParseFrom(req.Message.Content).Details.Values.SequenceEqual(request.Details.Values)
+    ));
+}
 
     [Fact]
     public async Task Log_Error_When_Try_To_Add_Associated_Id_To_Not_Exist_Session_Key()
@@ -325,7 +404,8 @@ public class SessionManagementServiceShould
         const uint Version = 1;
         const string Identifier = "Id1";
         IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
-        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset));
+        IReadOnlyDictionary<string, string> sessionDetails = new Dictionary<string, string>();
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
         const string NewAssociatedId = "1.4";
         var request = new AddAssociateSessionRequest

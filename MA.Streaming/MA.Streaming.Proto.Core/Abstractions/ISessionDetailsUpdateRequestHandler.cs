@@ -1,4 +1,4 @@
-// <copyright file="IKafkaBrokerAvailabilityChecker.cs" company="McLaren Applied Ltd.">
+// <copyright file="ISessionDetailsUpdateRequestHandler.cs" company="McLaren Applied Ltd.">
 //
 // Copyright 2024 McLaren Applied Ltd
 // 
@@ -15,11 +15,11 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Abstraction;
+using MA.Streaming.API;
 
-public interface IKafkaBrokerAvailabilityChecker
+namespace MA.Streaming.Proto.Core.Abstractions;
+
+public interface ISessionDetailsUpdateRequestHandler
 {
-    bool Check(string brokerUrl);
-
-    Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource);
+    Task<UpdateSessionDetailsResponse> UpdateSessionDetails(UpdateSessionDetailsRequest request);
 }

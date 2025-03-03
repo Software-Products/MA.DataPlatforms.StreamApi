@@ -57,11 +57,18 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Act
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Assert
         StreamingApiClient.Initialised.Should().BeTrue();
+    }
+
+    private static ICancellationTokenSourceProvider CreateCancellationTokenSourceProvider()
+    {
+        var cancellationTokenSourceProvider = Substitute.For<ICancellationTokenSourceProvider>();
+        cancellationTokenSourceProvider.Provide().Returns(new CancellationTokenSource());
+        return cancellationTokenSourceProvider;
     }
 
     [Fact]
@@ -70,7 +77,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Arrange
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Act
@@ -94,7 +101,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Arrange
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Act
@@ -109,7 +116,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Arrange
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Act
@@ -124,7 +131,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Arrange
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Act
@@ -139,7 +146,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         // Arrange
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
-            Substitute.For<ICancellationTokenSourceProvider>(),
+            CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             this.loggingDirectoryProvider);
         // Act

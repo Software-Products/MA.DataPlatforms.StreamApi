@@ -19,6 +19,7 @@ using FluentAssertions;
 
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
@@ -70,7 +71,8 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
             TopicPartitionOffsets =
             {
                 mapField
-            }
+            },
+            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
         };
 
         var sessionInfoPacketName = this.typeNameProvider.SessionInfoPacketTypeName;
@@ -202,6 +204,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
             DataSource = DataSource,
             Type = "Session",
             Version = 20,
+            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
         };
 
         //act
@@ -259,6 +262,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         getSessionInfoResponse2.IsComplete.Should().BeFalse();
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("");
+        getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
 
         ////////////////////////////////////////Updating The Session Identifiers///////////////////////////////////////////////////////////////////////
 
@@ -281,6 +285,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         getSessionInfoResponse2.IsComplete.Should().BeFalse();
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("test_identifier");
+        getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
 
         ////////////////////////////////////////Adding Associate SessionKeys///////////////////////////////////////////////////////////////////////
 
@@ -306,6 +311,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         getSessionInfoResponse2.IsComplete.Should().BeFalse();
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("test_identifier");
+        getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
 
         ////////////////////////////////////////Ending Of the Session///////////////////////////////////////////////////////////////////////
 
@@ -347,6 +353,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         getSessionInfoResponse2.IsComplete.Should().BeTrue();
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("test_identifier");
+        getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
     }
 
     private static byte[] GetPacketBytes(string sessionKey, string packetType, ByteString content)

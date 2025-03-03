@@ -16,6 +16,7 @@
 // </copyright>
 
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
@@ -48,29 +49,33 @@ public class GetSessionInfoRequestHandler : IGetSessionInfoRequestHandler
         }
 
         var streams = this.streamsProvider.Provide(foundSessionDetail.DataSource);
-        return await Task.FromResult(
-            new GetSessionInfoResponse
+
+        var response = new GetSessionInfoResponse
+        {
+            Type = foundSessionDetail.SessionInfoPacket.Type,
+            DataSource = foundSessionDetail.DataSource,
+            AssociateSessionKeys =
             {
-                Type = foundSessionDetail.SessionInfoPacket.Type,
-                DataSource = foundSessionDetail.DataSource,
-                AssociateSessionKeys =
-                {
-                    foundSessionDetail.SessionInfoPacket.AssociatedKeys
-                },
-                Identifier = foundSessionDetail.SessionInfoPacket.Identifier,
-                Version = foundSessionDetail.SessionInfoPacket.Version,
-                IsComplete = foundSessionDetail.Completed,
-                MainOffset = foundSessionDetail.MainOffset,
-                EssentialsOffset = foundSessionDetail.EssentialOffset,
-                TopicPartitionOffsets =
-                {
-                    GetTopicPartitionOffsets(foundSessionDetail.StartingOffsetInfo)
-                },
-                Streams =
-                {
-                    streams
-                }
-            });
+                foundSessionDetail.SessionInfoPacket.AssociatedKeys
+            },
+            Identifier = foundSessionDetail.SessionInfoPacket.Identifier,
+            Version = foundSessionDetail.SessionInfoPacket.Version,
+            IsComplete = foundSessionDetail.Completed,
+            MainOffset = foundSessionDetail.MainOffset,
+            EssentialsOffset = foundSessionDetail.EssentialOffset,
+            TopicPartitionOffsets =
+            {
+                GetTopicPartitionOffsets(foundSessionDetail.StartingOffsetInfo)
+            },
+            Streams =
+            {
+                streams
+            },
+            UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset)
+        };
+        response.Details.Add(foundSessionDetail.SessionInfoPacket.Details.ToDictionary(detail => detail.Key, detail => detail.Value));
+
+        return await Task.FromResult(response);
     }
 
     private static MapField<string, long> GetTopicPartitionOffsets(IEnumerable<TopicPartitionOffsetDto> startingOffsetInfo)
