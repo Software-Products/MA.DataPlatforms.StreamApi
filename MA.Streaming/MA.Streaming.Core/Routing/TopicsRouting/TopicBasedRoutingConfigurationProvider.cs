@@ -54,7 +54,7 @@ public class TopicBasedRoutingConfigurationProvider : IRoutingConfigurationProvi
         var config = this.streamingApiConfigurationProvider.Provide();
         return new RoutingConfiguration(
             new KafkaRoutingConfig(
-                new KafkaPublishingConfig(server: config.BrokerUrl, compressionLevel: -1, compressionType: 4, 0, 1_000_000, 500_000_000),
+                new KafkaPublishingConfig(config.BrokerUrl, -1, 4, 0, 1_000_000, 500_000_000),
                 routes,
                 [new KafkaTopicMetaData(topicName)],
                 "dead-Letter"));

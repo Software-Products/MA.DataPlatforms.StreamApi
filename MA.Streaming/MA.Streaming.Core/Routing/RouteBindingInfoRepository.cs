@@ -34,17 +34,15 @@ public class RouteBindingInfoRepository : IRouteBindingInfoRepository
             this.dataSourceBasedDictionary.TryGetValue(dataSource, out var dataSourceBindingInfo);
             return dataSourceBindingInfo;
         }
-        else
-        {
-            this.streamBasedDictionary.TryGetValue(dataSource, out var dataSourceStreamsDic);
-            if (dataSourceStreamsDic == null)
-            {
-                return null;
-            }
 
-            dataSourceStreamsDic.TryGetValue(stream, out var bindingInfo);
-            return bindingInfo;
+        this.streamBasedDictionary.TryGetValue(dataSource, out var dataSourceStreamsDic);
+        if (dataSourceStreamsDic == null)
+        {
+            return null;
         }
+
+        dataSourceStreamsDic.TryGetValue(stream, out var bindingInfo);
+        return bindingInfo;
     }
 
     public RouteBindingInfo? GetBindingInfoByRoute(string routeName)

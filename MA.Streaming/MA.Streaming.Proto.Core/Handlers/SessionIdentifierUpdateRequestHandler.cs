@@ -20,6 +20,7 @@ using Google.Protobuf;
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Contracts;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Core.Abstractions;
@@ -32,34 +33,53 @@ public class SessionIdentifierUpdateRequestHandler : ISessionIdentifierUpdateReq
     private readonly ILogger logger;
     private readonly IPacketWriterHelper packetWriterHelper;
     private readonly ITypeNameProvider typeNameProvider;
+    private readonly ISessionInfoService sessionInfoService;
 
     public SessionIdentifierUpdateRequestHandler(
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
         ILogger logger,
         IPacketWriterHelper packetWriterHelper,
-        ITypeNameProvider typeNameProvider)
+        ITypeNameProvider typeNameProvider,
+        ISessionInfoService sessionInfoService)
     {
         this.sessionInfoRepository = sessionInfoRepository;
         this.logger = logger;
         this.packetWriterHelper = packetWriterHelper;
         this.typeNameProvider = typeNameProvider;
+        this.sessionInfoService = sessionInfoService;
     }
 
-    public async Task<UpdateSessionIdentifierResponse> UpdateSessionIdentifier(UpdateSessionIdentifierRequest request)
+    public UpdateSessionIdentifierResponse UpdateSessionIdentifier(UpdateSessionIdentifierRequest request)
     {
         var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
         if (foundSessionDetail == null)
         {
-            return this.CreateUnsuccessfulResponse(request);
+            this.logger.Error($"try to update identifier for a session which is not added in the session management service. session key:{request.SessionKey}");
+            return CreateUnsuccessfulResponse();
         }
 
         var sessionInfo = CreatePacket(request, foundSessionDetail);
+
+        var res = this.sessionInfoService.UpdateSessionInfo(
+            request.SessionKey,
+            new SessionInfoPacketDto(
+                sessionInfo.Type,
+                sessionInfo.Version,
+                sessionInfo.Identifier,
+                sessionInfo.AssociateSessionKeys,
+                sessionInfo.Details));
+
+        if (!res.Success)
+        {
+            return CreateUnsuccessfulResponse();
+        }
+
         this.WritePacket(request, sessionInfo, foundSessionDetail);
 
-        return await Task.FromResult(CreateSuccessfulMessage());
+        return CreateSuccessfulResponse();
     }
 
-    private static UpdateSessionIdentifierResponse CreateSuccessfulMessage()
+    private static UpdateSessionIdentifierResponse CreateSuccessfulResponse()
     {
         return new UpdateSessionIdentifierResponse
         {
@@ -67,9 +87,8 @@ public class SessionIdentifierUpdateRequestHandler : ISessionIdentifierUpdateReq
         };
     }
 
-    private UpdateSessionIdentifierResponse CreateUnsuccessfulResponse(UpdateSessionIdentifierRequest request)
+    private static UpdateSessionIdentifierResponse CreateUnsuccessfulResponse()
     {
-        this.logger.Error($"try to update identifier for a session which is not added in the session management service. session key:{request.SessionKey}");
         return new UpdateSessionIdentifierResponse
         {
             Success = false
@@ -96,7 +115,11 @@ public class SessionIdentifierUpdateRequestHandler : ISessionIdentifierUpdateReq
             },
             DataSource = foundSessionDetail.DataSource,
             Identifier = request.Identifier,
-            Version = foundSessionDetail.SessionInfoPacket.Version
+            Version = foundSessionDetail.SessionInfoPacket.Version,
+            Details =
+            {
+                foundSessionDetail.SessionInfoPacket.Details.ToDictionary(i => i.Key, i => i.Value)
+            }
         };
         return sessionInfo;
     }

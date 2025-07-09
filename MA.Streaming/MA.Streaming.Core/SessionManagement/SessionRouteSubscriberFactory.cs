@@ -18,6 +18,7 @@
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 
@@ -27,15 +28,18 @@ public class SessionRouteSubscriberFactory : ISessionRouteSubscriberFactory
 {
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+    private readonly IRouteManager routeManager;
     private readonly ILogger logger;
 
     public SessionRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
+        IRouteManager routeManager,
         ILogger logger)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+        this.routeManager = routeManager;
         this.logger = logger;
     }
 
@@ -55,6 +59,6 @@ public class SessionRouteSubscriberFactory : ISessionRouteSubscriberFactory
                 this.cancellationTokenSourceProvider,
                 this.logger),
             sessionInfoConsumingConfigurationProvider,
-            this.logger);
+            this.routeManager);
     }
 }

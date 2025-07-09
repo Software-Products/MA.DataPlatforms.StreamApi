@@ -18,6 +18,7 @@
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
@@ -29,15 +30,18 @@ public class TopicBasedRouteSubscriberFactory : IRouteSubscriberFactory
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
     private readonly ITopicBaseTopicNameCreator topicBaseTopicNameCreator;
     private readonly ILogger logger;
+    private readonly IRouteManager routeManager;
 
     public TopicBasedRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         ITopicBaseTopicNameCreator topicBaseTopicNameCreator,
-        ILogger logger)
+        ILogger logger,
+        IRouteManager routeManager)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.topicBaseTopicNameCreator = topicBaseTopicNameCreator;
         this.logger = logger;
+        this.routeManager = routeManager;
     }
 
     public IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto, IRouteBindingInfoRepository routeBindingInfoRepository)
@@ -54,6 +58,6 @@ public class TopicBasedRouteSubscriberFactory : IRouteSubscriberFactory
                 new CancellationTokenSourceProvider(),
                 this.logger),
             topicBasedConsumingConfigurationProvider,
-            this.logger);
+            this.routeManager);
     }
 }

@@ -19,6 +19,7 @@ using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent;
 using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent.BrokersPublishers.KafkaBroking;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.Routing.EssentialsRouting;
@@ -31,18 +32,21 @@ public class PartitionBasedRouterProvider : IRouterProvider
     private readonly IStreamingApiConfigurationProvider configurationProvider;
     private readonly IRouteBindingInfoRepository routeBindingInfoRepository;
     private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
+    private readonly IRouteManager routeManager;
     private IRouter? partitionBasedRouter;
 
     public PartitionBasedRouterProvider(
         ILogger logger,
         IStreamingApiConfigurationProvider configurationProvider,
         IRouteBindingInfoRepository routeBindingInfoRepository,
-        IEssentialTopicNameCreator essentialTopicNameCreator)
+        IEssentialTopicNameCreator essentialTopicNameCreator,
+        IRouteManager routeManager)
     {
         this.logger = logger;
         this.configurationProvider = configurationProvider;
         this.routeBindingInfoRepository = routeBindingInfoRepository;
         this.essentialTopicNameCreator = essentialTopicNameCreator;
+        this.routeManager = routeManager;
     }
 
     public IRouter Provide(string dataSource, string stream = "")
@@ -63,7 +67,8 @@ public class PartitionBasedRouterProvider : IRouterProvider
             this.logger,
             new KafkaProducerBuilder(
                 this.logger,
-                new PartitionBasedRoutingConfigurationProvider(dataSource, this.configurationProvider, this.routeBindingInfoRepository, this.essentialTopicNameCreator)));
+                new PartitionBasedRoutingConfigurationProvider(dataSource, this.configurationProvider, this.routeBindingInfoRepository, this.essentialTopicNameCreator),
+                this.routeManager));
         router.Initiate();
         return router;
     }

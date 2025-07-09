@@ -40,12 +40,12 @@ public class GetSessionInfoRequestHandler : IGetSessionInfoRequestHandler
         this.streamsProvider = streamsProvider;
     }
 
-    public async Task<GetSessionInfoResponse> GetSessionInfo(GetSessionInfoRequest request)
+    public GetSessionInfoResponse GetSessionInfo(GetSessionInfoRequest request)
     {
         var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
         if (foundSessionDetail == null)
         {
-            return new GetSessionInfoResponse();
+            return new GetSessionInfoResponse { Success = false };
         }
 
         var streams = this.streamsProvider.Provide(foundSessionDetail.DataSource);
@@ -71,11 +71,12 @@ public class GetSessionInfoRequestHandler : IGetSessionInfoRequestHandler
             {
                 streams
             },
-            UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset)
+            UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset),
+            Success = true
         };
         response.Details.Add(foundSessionDetail.SessionInfoPacket.Details.ToDictionary(detail => detail.Key, detail => detail.Value));
 
-        return await Task.FromResult(response);
+        return response;
     }
 
     private static MapField<string, long> GetTopicPartitionOffsets(IEnumerable<TopicPartitionOffsetDto> startingOffsetInfo)

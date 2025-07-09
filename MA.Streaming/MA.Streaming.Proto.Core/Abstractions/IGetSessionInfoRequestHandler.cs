@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface IGetSessionInfoRequestHandler
 {
-    Task<GetSessionInfoResponse> GetSessionInfo(GetSessionInfoRequest request);
+    GetSessionInfoResponse GetSessionInfo(GetSessionInfoRequest request);
 }

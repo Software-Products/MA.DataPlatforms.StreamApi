@@ -50,11 +50,10 @@ public class PartitionBasedKafkaRouteInfoProvider : KafkaRouteInfoProvider
         var result = new List<KafkaRouteInfo>
         {
             mainRouteInfo,
-            essentialRoueInfo,
+            essentialRoueInfo
         };
         result.AddRange(
-            configurationPartitionMappings.Select(
-                configurationPartitionMapping => CreateStreamsKafkaRouteInfo(dataSource, topicInfos, configurationPartitionMapping)));
+            configurationPartitionMappings.Select(configurationPartitionMapping => CreateStreamsKafkaRouteInfo(dataSource, topicInfos, configurationPartitionMapping)));
 
         return result;
     }
@@ -84,7 +83,7 @@ public class PartitionBasedKafkaRouteInfoProvider : KafkaRouteInfoProvider
         var result = new List<KafkaRouteInfo>
         {
             new(dataSource, dataSource, 0, 0, dataSource),
-            this.CreateEssentialRouteInfo(dataSource, []),
+            this.CreateEssentialRouteInfo(dataSource, [])
         };
         result.AddRange(
             configurationPartitionMappings.Select(i => new KafkaRouteInfo(CreateRouteName(dataSource, i.Stream), dataSource, i.Partition, 0, dataSource, i.Stream)));

@@ -83,19 +83,18 @@ public abstract class BaseConsumingConfigurationProvider : IConsumingConfigurati
 
         kafkaSubscriptionConfigs.AddRange(
             streams
-                .Select(
-                    (stream, i) =>
-                    {
-                        var streamRoute = this.GetStreamRoute(stream);
-                        return new KafkaConsumingConfig(
-                            new KafkaListeningConfig(
-                                this.StreamApiConfig.BrokerUrl,
-                                Guid.NewGuid().ToString(),
-                                AutoOffsetResetMode.FromOffset,
-                                this.ConnectionDetailsDto.StreamOffsets[i]),
-                            streamRoute,
-                            GetKafkaTopicMetaData(mainTopicName, mainTopicPartitionNumbers, streamRoute));
-                    }));
+                .Select((stream, i) =>
+                {
+                    var streamRoute = this.GetStreamRoute(stream);
+                    return new KafkaConsumingConfig(
+                        new KafkaListeningConfig(
+                            this.StreamApiConfig.BrokerUrl,
+                            Guid.NewGuid().ToString(),
+                            AutoOffsetResetMode.FromOffset,
+                            this.ConnectionDetailsDto.StreamOffsets[i]),
+                        streamRoute,
+                        GetKafkaTopicMetaData(mainTopicName, mainTopicPartitionNumbers, streamRoute));
+                }));
     }
 
     private static KafkaTopicMetaData GetKafkaTopicMetaData(string mainTopicName, int mainTopicPartitionNumbers, KafkaRoute streamRoute)

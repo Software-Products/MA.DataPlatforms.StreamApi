@@ -21,9 +21,9 @@ using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 
-using MA.Common;
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
@@ -68,7 +68,8 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
                     integrateSessionManagement: true));
         var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
         var logger = Substitute.For<ILogger>();
-        var sessionRouteSubscriberFactory = new SessionRouteSubscriberFactory(apiConfigurationProvider, cancellationTokenSourceProvider, logger);
+        var kafkaRouteManager = new KafkaRouteManager(logger);
+        var sessionRouteSubscriberFactory = new SessionRouteSubscriberFactory(apiConfigurationProvider, cancellationTokenSourceProvider, kafkaRouteManager, logger);
         var packetDtoFromByteFactory = new PacketDtoFromByteFactory(logger);
         var newSessionDtoFromByteFactory = new NewSessionPacketDtoFromByteFactory(logger);
         var endOfSessionDtoFromByteFactory = new EndOfSessionPacketDtoFromByteFactory(logger);
@@ -77,6 +78,7 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         var datasourceRepository = Substitute.For<IDataSourcesRepository>();
         this.typeNameProvider = new TypeNameProvider();
         this.sessionInfoService = new SessionInfoService(
+            apiConfigurationProvider,
             this.memoryRepository,
             sessionRouteSubscriberFactory,
             logger,
@@ -100,8 +102,11 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         //act
         try
         {
+            this.sessionInfoService.ServiceStarted += (_, _) =>
+            {
+                startingSuccess = true;
+            };
             this.sessionInfoService.Start();
-            startingSuccess = true;
         }
         catch (Exception ex)
         {
@@ -123,7 +128,6 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
 
         this.sessionInfoService.Start();
         var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
-        new AutoResetEvent(false).WaitOne(2000);
 
         //assert
         beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
@@ -137,11 +141,15 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
     [Fact]
     public void Read_All_Exist_Session_Related_Packets_And_Update_The_Repository()
     {
-        new AutoResetEvent(false).WaitOne(5000);
         //arrange
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var kafkaTopicHelper = new KafkaTopicHelper();
         var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
+        var serviceStarted = false;
+        var serviceStopped = false;
+
+        this.sessionInfoService.ServiceStarted += (_, _) => serviceStarted = true;
+        this.sessionInfoService.ServiceStopped += (_, _) => serviceStopped = true;
 
         const string DataSource = "Session_Info_Test_Datasource";
         MetricProviders.NumberOfSessions.WithLabels(DataSource).Set(0);
@@ -185,7 +193,7 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
             AssociateSessionKeys =
             {
                 associatedId1
-            }
+            },
         };
 
         var addAssociateSessionPacket2 = new SessionInfoPacket
@@ -194,7 +202,7 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
             {
                 associatedId1,
                 associatedId2
-            }
+            },
         };
 
         var endSessionPacket = new EndOfSessionPacket
@@ -233,10 +241,10 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
 
         //act
         this.sessionInfoService.Start();
-        new AutoResetEvent(false).WaitOne(5000);
         var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
-        new AutoResetEvent(false).WaitOne(5000);
         //assert
+        serviceStarted.Should().BeTrue();
+        serviceStopped.Should().BeFalse();
         beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
         afterStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeTrue();
         var sessions = this.memoryRepository.GetAll(i => i.DataSource == DataSource);
@@ -257,6 +265,12 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         sessions[0].SessionInfoPacket.Type.Should().Be(sessionInfoPacketName);
         sessions[0].SessionInfoPacket.Version.Should().Be(Version);
         MetricProviders.NumberOfSessions.WithLabels(DataSource).Value.Should().Be(1);
+
+        //act
+        this.sessionInfoService.Stop();
+
+        //assert
+        serviceStopped.Should().BeTrue();
     }
 
     private static byte[] GetPacketBytes(string sessionKey, string packetType, ByteString content)

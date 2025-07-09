@@ -82,7 +82,7 @@ public class WritePacketRequestStreamReaderHandler : IWritePacketRequestStreamRe
                         break;
                     }
 
-                    Task.Delay(5).Wait();
+                    Task.Delay(5).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
             });
 

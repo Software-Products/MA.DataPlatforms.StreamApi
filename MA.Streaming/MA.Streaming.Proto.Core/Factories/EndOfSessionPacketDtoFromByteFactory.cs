@@ -38,12 +38,11 @@ public class EndOfSessionPacketDtoFromByteFactory : IDtoFromByteFactory<EndOfSes
             var endOfSessionPacket = EndOfSessionPacket.Parser.ParseFrom(content);
             return new EndOfSessionPacketDto(
                 endOfSessionPacket.DataSource,
-                endOfSessionPacket.TopicPartitionOffsets.Select(
-                    i =>
-                    {
-                        var parseInfo = this.ParseTopicPartition(i.Key);
-                        return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
-                    }).ToList());
+                endOfSessionPacket.TopicPartitionOffsets.Select(i =>
+                {
+                    var parseInfo = ParseTopicPartition(i.Key);
+                    return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
+                }).ToList());
         }
         catch (Exception ex)
         {
@@ -53,16 +52,14 @@ public class EndOfSessionPacketDtoFromByteFactory : IDtoFromByteFactory<EndOfSes
         }
     }
 
-    private KeyValuePair<string, int> ParseTopicPartition(string topicPartitionName)
+   private static KeyValuePair<string, int> ParseTopicPartition(string topicPartitionName)
     {
-        if (!topicPartitionName.Contains(":"))
+        if (!topicPartitionName.Contains(':'))
         {
             return new KeyValuePair<string, int>(topicPartitionName, 0);
         }
-        else
-        {
-            var parts = topicPartitionName.Split(':');
-            return new KeyValuePair<string, int>(parts[0], int.Parse(parts[1]));
-        }
+
+        var parts = topicPartitionName.Split(':');
+        return new KeyValuePair<string, int>(parts[0], int.Parse(parts[1]));
     }
 }

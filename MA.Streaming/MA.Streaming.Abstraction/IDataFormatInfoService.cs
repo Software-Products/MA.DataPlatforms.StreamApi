@@ -15,10 +15,26 @@
 // limitations under the License.
 // </copyright>
 
+using MA.Streaming.Contracts;
+
 namespace MA.Streaming.Abstraction;
 
 public interface IDataFormatInfoService
 {
+    public event EventHandler<DataFormatRecord> NewRecordFound;
+
+    public event EventHandler<DateTime>? ServiceStarted;
+
+    public event EventHandler<DateTime>? ServiceStopped;
+
+    public void Add(string dataSource, IReadOnlyList<string> identifiers, ulong dataFormatId, DataFormatTypeDto formatTypeDto);
+
+    public DataFormatRecord? GetByIdentifier(string dataSource, IReadOnlyList<string> identifiers, DataFormatTypeDto formatTypeDto);
+
+    public DataFormatRecord? GetByDataFormatId(string dataSource, ulong dataFormatId, DataFormatTypeDto formatTypeDto);
+
+    public IReadOnlyList<DataFormatRecord> GetDataSourceDataFormats(string datasource);
+
     public void Start();
 
     public void Stop();

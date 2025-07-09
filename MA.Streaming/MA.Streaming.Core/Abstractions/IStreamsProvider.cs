@@ -15,10 +15,9 @@
 // limitations under the License.
 // </copyright>
 
-namespace MA.Streaming.Core.Abstractions
+namespace MA.Streaming.Core.Abstractions;
+
+public interface IStreamsProvider
 {
-    public interface IStreamsProvider
-    {
-        public IReadOnlyList<string> Provide(string dataSource);
-    }
+    public IReadOnlyList<string> Provide(string dataSource);
 }

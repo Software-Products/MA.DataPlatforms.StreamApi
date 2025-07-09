@@ -36,4 +36,6 @@ public interface IStreamingApiConfiguration
     string RemoteKeyGeneratorServiceAddress { get; }
 
     bool BatchingResponses { get; }
+
+    public uint InitialisationTimeoutSeconds { get; }
 }

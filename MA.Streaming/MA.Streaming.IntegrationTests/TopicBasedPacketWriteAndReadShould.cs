@@ -44,7 +44,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
     private const string BrokerUrl = "localhost:9097";
     private const string AppGroup1Stream = "AppGroup1Stream";
     private const string AppGroup2Stream = "AppGroup2Stream";
-    private const string DataSource = "TopicBased_Batched_SampleDataSource";
+    private const string DataSource = "TopicBased_Not_Batched_SampleDataSource";
     private const string SessionKey = " TopicBasedPacketWriteAndBatchReadShould_Session_Key";
     private const string SampleType = "SampleType";
     private readonly ITestOutputHelper outputHelper;
@@ -161,7 +161,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
@@ -411,7 +411,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest1);
         await this.WriteDataPacket(writeDataPacketRequest2);
@@ -490,7 +490,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
@@ -577,7 +577,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         var publishStopWatch = new Stopwatch();
         publishStopWatch.Start();
@@ -668,7 +668,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
@@ -769,7 +769,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         var publishStopWatch = new Stopwatch();
         publishStopWatch.Start();

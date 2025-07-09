@@ -31,6 +31,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\MA.Streaming.Proto.Client.Local\MA.Streaming.Proto.Client.Local.csproj" />
+		<ProjectReference Include="..\MA.Streaming.Proto.ServerComponent.Host\MA.Streaming.Proto.ServerComponent.Host.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
