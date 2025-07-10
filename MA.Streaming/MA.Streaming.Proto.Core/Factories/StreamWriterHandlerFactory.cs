@@ -38,8 +38,6 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
     private readonly IStreamingApiConfiguration config;
-    private readonly object lockObject = new();
-
     public StreamWriterHandlerFactory(
         IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler> handlerRepository,
         IRouteSubscriberFactory routeSubscriberFactory,
@@ -56,20 +54,23 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
         this.config = apiConfigurationProvider.Provide();
     }
 
-    public IReadPacketResponseStreamWriterHandler? Create(long connectionId, IServerStreamWriter<ReadPacketsResponse> serverStreamWriter, ServerCallContext context)
+    public async Task<IReadPacketResponseStreamWriterHandler?> Create(
+        long connectionId,
+        IServerStreamWriter<ReadPacketsResponse> serverStreamWriter,
+        ServerCallContext context)
     {
-        lock (this.lockObject)
+        try
         {
             var handler = this.handlerRepository.Get(connectionId);
             if (handler != null)
             {
-                return handler;
+                return await Task.FromResult(handler);
             }
 
             this.activeConnectionManager.TryGetConnection(connectionId, out var connectionDetails);
             if (connectionDetails is null)
             {
-                return null;
+                return await Task.FromResult<IReadPacketResponseStreamWriterHandler?>(null);
             }
 
             var connectionDetailsDto = this.connectionDtoMapper.Map(new ConnectionInfo(connectionId, connectionDetails));
@@ -87,7 +88,12 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
                 this.config.BatchingResponses,
                 this.logger,
                 new AutoResetEvent(false));
-            return handler;
+            return await Task.FromResult(handler);
+        }
+        catch (Exception ex)
+        {
+            this.logger.Error($"can not create reader connector service {ex}");
+            return await Task.FromResult<IReadPacketResponseStreamWriterHandler?>(null);
         }
     }
 }

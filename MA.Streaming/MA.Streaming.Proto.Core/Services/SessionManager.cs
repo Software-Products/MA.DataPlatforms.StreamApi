@@ -56,7 +56,6 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
         this.requestHandler = requestHandler;
         this.sessionInfoRepository = sessionInfoRepository;
         this.sessionNotificationManagerService = sessionNotificationManagerService;
-
         this.enabled = apiConfigurationProvider.Provide().IntegrateSessionManagement;
     }
 
@@ -64,27 +63,36 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
     {
         if (!this.enabled)
         {
-            return new CreateSessionResponse();
+            return new CreateSessionResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.sessionCreationRequestHandler.Handle(request);
+        return await Task.FromResult(this.sessionCreationRequestHandler.Handle(request));
     }
 
     public override async Task<EndSessionResponse> EndSession(EndSessionRequest request, ServerCallContext context)
     {
         if (!this.enabled)
         {
-            return new EndSessionResponse();
+            return new EndSessionResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.sessionEndingRequestHandler.Handle(request);
+        return await Task.FromResult(this.sessionEndingRequestHandler.Handle(request));
     }
 
     public override async Task<GetCurrentSessionsResponse> GetCurrentSessions(GetCurrentSessionsRequest request, ServerCallContext context)
     {
         if (!this.enabled)
         {
-            return new GetCurrentSessionsResponse();
+            return new GetCurrentSessionsResponse
+            {
+                Success = false
+            };
         }
 
         var allSession = this.sessionInfoRepository.GetAll().Where(i => i.DataSource == request.DataSource);
@@ -94,7 +102,8 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
                 SessionKeys =
                 {
                     allSession.Select(i => i.SessionKey)
-                }
+                },
+                Success = true
             });
     }
 
@@ -102,10 +111,13 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
     {
         if (!this.enabled)
         {
-            return new GetSessionInfoResponse();
+            return new GetSessionInfoResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.getSessionInfoRequestHandler.GetSessionInfo(request);
+        return await Task.FromResult(this.getSessionInfoRequestHandler.GetSessionInfo(request));
     }
 
     public override async Task GetSessionStartNotification(
@@ -138,29 +150,38 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
     {
         if (!this.enabled)
         {
-            return new UpdateSessionIdentifierResponse();
+            return new UpdateSessionIdentifierResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.sessionIdentifierUpdateRequestHandler.UpdateSessionIdentifier(request);
+        return await Task.FromResult(this.sessionIdentifierUpdateRequestHandler.UpdateSessionIdentifier(request));
     }
 
     public override async Task<AddAssociateSessionResponse> AddAssociateSession(AddAssociateSessionRequest request, ServerCallContext context)
     {
         if (!this.enabled)
         {
-            return new AddAssociateSessionResponse();
+            return new AddAssociateSessionResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.requestHandler.AddAssociateSession(request);
+        return await Task.FromResult(this.requestHandler.AddAssociateSession(request));
     }
 
     public override async Task<UpdateSessionDetailsResponse> UpdateSessionDetails(UpdateSessionDetailsRequest request, ServerCallContext context)
     {
         if (!this.enabled)
         {
-            return new UpdateSessionDetailsResponse();
+            return new UpdateSessionDetailsResponse
+            {
+                Success = false
+            };
         }
 
-        return await this.sessionDetailsUpdateRequestHandler.UpdateSessionDetails(request);
+        return await Task.FromResult(this.sessionDetailsUpdateRequestHandler.UpdateSessionDetails(request));
     }
 }

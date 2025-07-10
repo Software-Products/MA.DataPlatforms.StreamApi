@@ -19,6 +19,7 @@ using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent;
 using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent.BrokersPublishers.KafkaBroking;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.Routing.EssentialsRouting;
@@ -33,7 +34,9 @@ public class TopicBasedRouterProvider : IRouterProvider
     private readonly IRouteBindingInfoRepository routeBindingInfoRepository;
     private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
     private readonly ITopicBaseTopicNameCreator topicBaseTopicNameCreator;
+    private readonly IRouteManager routeManager;
 
+    private readonly object readerWriterLock = new();
     private readonly Dictionary<string, IRouter> routers = new();
 
     public TopicBasedRouterProvider(
@@ -41,35 +44,42 @@ public class TopicBasedRouterProvider : IRouterProvider
         IStreamingApiConfigurationProvider configurationProvider,
         IRouteBindingInfoRepository routeBindingInfoRepository,
         IEssentialTopicNameCreator essentialTopicNameCreator,
-        ITopicBaseTopicNameCreator topicBaseTopicNameCreator)
+        ITopicBaseTopicNameCreator topicBaseTopicNameCreator,
+        IRouteManager routeManager)
     {
         this.routerLogger = routerLogger;
         this.configurationProvider = configurationProvider;
         this.routeBindingInfoRepository = routeBindingInfoRepository;
         this.essentialTopicNameCreator = essentialTopicNameCreator;
         this.topicBaseTopicNameCreator = topicBaseTopicNameCreator;
+        this.routeManager = routeManager;
     }
 
     public IRouter Provide(string dataSource, string stream = "")
     {
-        if (!this.routers.TryGetValue(dataSource, out var mainRouter))
+        lock (this.readerWriterLock)
         {
-            mainRouter = this.CreateMainTopicRouter(dataSource);
-            this.routers.Add(dataSource, mainRouter);
-        }
+            if (!this.routers.TryGetValue(dataSource, out var mainRouter))
+            {
+                mainRouter = this.CreateMainTopicRouter(dataSource);
+                this.routers.Add(dataSource, mainRouter);
+            }
 
-        if (string.IsNullOrEmpty(stream))
-        {
-            return mainRouter;
-        }
+            if (string.IsNullOrEmpty(stream))
+            {
+                return mainRouter;
+            }
 
-        if (!this.routers.TryGetValue(this.topicBaseTopicNameCreator.Create(dataSource, stream), out var streamRouter))
-        {
+            if (this.routers.TryGetValue(this.topicBaseTopicNameCreator.Create(dataSource, stream), out var streamRouter))
+            {
+                return streamRouter;
+            }
+
             streamRouter = this.CreateStreamTopicRouter(dataSource, stream);
             this.routers.Add(this.topicBaseTopicNameCreator.Create(dataSource, stream), streamRouter);
-        }
 
-        return streamRouter;
+            return streamRouter;
+        }
     }
 
     private IRouter CreateStreamTopicRouter(string dataSource, string stream)
@@ -83,7 +93,8 @@ public class TopicBasedRouterProvider : IRouterProvider
                     stream,
                     this.configurationProvider,
                     this.routeBindingInfoRepository,
-                    this.topicBaseTopicNameCreator)));
+                    this.topicBaseTopicNameCreator),
+                this.routeManager));
         router.Initiate();
         return router;
     }
@@ -98,7 +109,8 @@ public class TopicBasedRouterProvider : IRouterProvider
                     dataSource,
                     this.configurationProvider,
                     this.routeBindingInfoRepository,
-                    this.essentialTopicNameCreator)));
+                    this.essentialTopicNameCreator),
+                this.routeManager));
         router.Initiate();
         return router;
     }

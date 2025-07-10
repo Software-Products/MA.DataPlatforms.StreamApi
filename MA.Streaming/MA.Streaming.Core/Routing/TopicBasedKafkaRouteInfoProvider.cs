@@ -49,9 +49,9 @@ public class TopicBasedKafkaRouteInfoProvider : KafkaRouteInfoProvider
     private static IEnumerable<KafkaRouteInfo> CreateStreamsRouteInfo(string dataSource, IEnumerable<TopicInfo> topicInfos)
     {
         var pattern = $@"^{dataSource}\.[^.]*$";
-        return (from foundTopicInfo in topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase,TimeSpan.FromSeconds(1)).Success)
+        return from foundTopicInfo in topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).Success)
             let streamName = foundTopicInfo.TopicName.Replace($"{dataSource}.", "")
-            select new KafkaRouteInfo($"{dataSource}.{streamName}", foundTopicInfo.TopicName, 0, foundTopicInfo.Offset, dataSource, streamName));
+            select new KafkaRouteInfo($"{dataSource}.{streamName}", foundTopicInfo.TopicName, 0, foundTopicInfo.Offset, dataSource, streamName);
     }
 
     private static KafkaRouteInfo CreateMainRouteInfo(string dataSource, TopicInfo? mainTopicInfo)

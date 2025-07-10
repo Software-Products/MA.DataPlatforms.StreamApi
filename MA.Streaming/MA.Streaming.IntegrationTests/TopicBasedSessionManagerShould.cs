@@ -47,7 +47,6 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
     internal const string Stream2 = "stream2";
     private const string PreExistSessionKey = "0f8fad5b-d9cb-469f-a165-70867728950e";
     private readonly SessionManagementService.SessionManagementServiceClient sessionManagementClient;
-    private readonly TypeNameProvider typeNameProvider;
 
     public TopicBasedSessionManagerShould(KafkaTestsCleanUpFixture _)
     {
@@ -57,7 +56,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
         new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(Constants.SessionInfoTopicName, 1));
         new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData($"{DataSource}.{Stream1}", 1));
         new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData($"{DataSource}.{Stream2}", 1));
-        this.typeNameProvider = new TypeNameProvider();
+        var typeNameProvider1 = new TypeNameProvider();
 
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var mapField = new MapField<string, long>
@@ -82,7 +81,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
             UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
         };
 
-        var sessionInfoPacketName = this.typeNameProvider.SessionInfoPacketTypeName;
+        var sessionInfoPacketName = typeNameProvider1.SessionInfoPacketTypeName;
         const uint Version = 1;
         var newSessionInfoPacket = new SessionInfoPacket
         {
@@ -124,7 +123,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         kafkaPublishHelper.PublishData(
             Constants.SessionInfoTopicName,
-            GetPacketBytes(PreExistSessionKey, this.typeNameProvider.NewSessionPacketTypeName, newSessionPacket.ToByteString()),
+            GetPacketBytes(PreExistSessionKey, typeNameProvider1.NewSessionPacketTypeName, newSessionPacket.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
             Constants.SessionInfoTopicName,
@@ -148,7 +147,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
             Constants.SessionInfoTopicName,
-            GetPacketBytes(PreExistSessionKey, this.typeNameProvider.EndOfSessionPacketTypeName, endSessionPacket.ToByteString()),
+            GetPacketBytes(PreExistSessionKey, typeNameProvider1.EndOfSessionPacketTypeName, endSessionPacket.ToByteString()),
             PreExistSessionKey);
         Task.Delay(5000).Wait();
         var apiConfigurationProvider =
@@ -233,7 +232,6 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         //////////////////////////////////////Get Current Sessions///////////////////////////////////////////////////////////////////
         //arrange
-        new AutoResetEvent(false).WaitOne(2000);
         getCurrentSessionsRequest = new GetCurrentSessionsRequest
         {
             DataSource = DataSource
@@ -290,7 +288,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         //act
         var updateSessionIdentifierResponse = this.sessionManagementClient.UpdateSessionIdentifier(updateSessionIdentifierRequest);
-        new AutoResetEvent(false).WaitOne(2000);
+        
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
         //assert
         updateSessionIdentifierResponse.Success.Should().BeTrue();
@@ -314,7 +312,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         //act
         var addAssociateSessionResponse = this.sessionManagementClient.AddAssociateSession(addAssociateSessionRequest);
-        new AutoResetEvent(false).WaitOne(1000);
+      
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
 
         //assert
@@ -340,6 +338,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
             {
                 DataSource = DataSource
             });
+        var endAutoResetEvent = new AutoResetEvent(false);
         var endNotificationReceived = false;
         _ = Task.Run(
             async () =>
@@ -349,14 +348,15 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
                     var notification = sessionStopNotification.ResponseStream.Current;
                     notification.SessionKey.Should().Be(createdSessionKey);
                     endNotificationReceived = true;
+                    endAutoResetEvent.Set();
                 }
             },
             cancellationToken);
         //act
         var endSessionResponse = this.sessionManagementClient.EndSession(endSessionRequest);
-        new AutoResetEvent(false).WaitOne(2000);
+        
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
-
+        endAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         //assert
         endNotificationReceived.Should().BeTrue();
         endSessionResponse.EndSession.DataSource.Should().Be(DataSource);

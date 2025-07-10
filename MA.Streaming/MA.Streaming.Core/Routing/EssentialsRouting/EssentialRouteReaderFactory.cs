@@ -20,6 +20,7 @@ using System.Collections.Concurrent;
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteReaderComponent;
 using MA.DataPlatforms.Secu4.RouteReaderComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 
@@ -31,6 +32,7 @@ public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
     private readonly IRouteBindingInfoRepository routeBindingInfoRepository;
     private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+    private readonly IRouteManager routeManager;
     private readonly ILogger logger;
     private readonly ConcurrentDictionary<long, IRouteReader> readers = new();
 
@@ -39,12 +41,14 @@ public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
         IRouteBindingInfoRepository routeBindingInfoRepository,
         IEssentialTopicNameCreator essentialTopicNameCreator,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
+        IRouteManager routeManager,
         ILogger logger)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.routeBindingInfoRepository = routeBindingInfoRepository;
         this.essentialTopicNameCreator = essentialTopicNameCreator;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+        this.routeManager = routeManager;
         this.logger = logger;
     }
 
@@ -67,6 +71,6 @@ public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
                 this.cancellationTokenSourceProvider,
                 this.logger),
             basedSubscriptionConfigurationProvider,
-            this.logger);
+            this.routeManager);
     }
 }

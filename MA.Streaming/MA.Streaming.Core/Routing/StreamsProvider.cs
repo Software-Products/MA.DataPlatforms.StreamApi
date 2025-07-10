@@ -27,11 +27,15 @@ public class StreamsProvider : IStreamsProvider
 {
     private readonly IKafkaTopicHelper kafkaTopicHelper;
     private readonly IStreamingApiConfiguration configuration;
+    private List<string> lastStreams;
+    private DateTime lastUpdateTime;
 
     public StreamsProvider(IStreamingApiConfigurationProvider apiConfigurationProvider, IKafkaTopicHelper kafkaTopicHelper)
     {
         this.kafkaTopicHelper = kafkaTopicHelper;
         this.configuration = apiConfigurationProvider.Provide();
+        this.lastUpdateTime = DateTime.MinValue;
+        this.lastStreams = [];
     }
 
     public IReadOnlyList<string> Provide(string dataSource)
@@ -46,9 +50,17 @@ public class StreamsProvider : IStreamsProvider
 
     private IReadOnlyList<string> GetStreamsFromTopic(string dataSource)
     {
+        if ((DateTime.UtcNow - this.lastUpdateTime).TotalSeconds < 1)
+        {
+            return this.lastStreams;
+        }
+
         var topicInfos = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.configuration.BrokerUrl, dataSource);
         var pattern = $@"^{dataSource}\.[^.]*$";
-        return topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).Success)
+        var res = topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).Success)
             .Select(foundTopicInfo => foundTopicInfo.TopicName.Replace($"{dataSource}.", "")).ToList();
+        this.lastUpdateTime = DateTime.UtcNow;
+        this.lastStreams = res;
+        return res;
     }
 }

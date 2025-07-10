@@ -24,7 +24,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 using ILogger = MA.Common.Abstractions.ILogger;
 
@@ -38,10 +37,7 @@ public sealed class Server : IServer
     private readonly IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker;
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
     private readonly bool registerServices;
-    private readonly object locker = new();
     private WebApplication? webApp;
-
-    private CancellationTokenSource? availabilityCheckerTokenSource;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
@@ -77,14 +73,10 @@ public sealed class Server : IServer
 
     public Task Stop()
     {
-        this.availabilityCheckerTokenSource?.Cancel();
+        this.cancellationTokenSourceProvider.Provide().Cancel();
 
-        WebApplication? webAppCopy;
-        lock (this.locker)
-        {
-            webAppCopy = this.webApp;
-            this.webApp = null;
-        }
+        var webAppCopy = this.webApp;
+        this.webApp = null;
 
         return webAppCopy?.DisposeAsync().AsTask() ?? Task.CompletedTask;
     }
@@ -98,27 +90,12 @@ public sealed class Server : IServer
             this.ConfigureListenOptions
         );
 
-        builder.WebHost.ConfigureLogging(
-            logging =>
-            {
-                logging.ClearProviders();
-                logging.SetMinimumLevel(LogLevel.Warning);
-                logging.AddConsole();
-            });
-
         builder.Services.AddGrpc();
-       
-        if (this.registerServices)
-        {
-            builder.Services.AddTransient<ConnectionManager>();
-            builder.Services.AddTransient<DataFormatManager>();
-            builder.Services.AddTransient<PacketWriter>();
-            builder.Services.AddTransient<PacketReader>();
-            builder.Services.AddTransient<SessionManager>();
-        }
 
         // Add services to the container.
-        new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider, this.loggingDirectoryProvider).Configure(builder.Services);
+        new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider, this.loggingDirectoryProvider).Configure(
+            builder.Services,
+            this.registerServices);
 
         this.webApp = builder.Build();
 

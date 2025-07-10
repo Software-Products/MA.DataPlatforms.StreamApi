@@ -19,6 +19,7 @@ using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 
@@ -29,26 +30,30 @@ public class DataFormatRouteSubscriberFactory : IDataFormatRouteSubscriberFactor
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly ILogger logger;
+    private readonly IRouteManager routeManager;
 
     public DataFormatRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
-        ILogger logger)
+        ILogger logger,
+        IRouteManager routeManager)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.logger = logger;
+        this.routeManager = routeManager;
     }
 
     public IRouteSubscriber Create(IReadOnlyList<KafkaRoute> routes)
     {
         var dataFormatSubscriptionConfigurationProvider = new DataFormatConsumingConfigurationProvider(this.streamingApiConfigurationProvider, routes);
-        return new KafkaRouteSubscriber(
-            new KafkaListenerFactory(
-                dataFormatSubscriptionConfigurationProvider,
-                this.cancellationTokenSourceProvider,
-                this.logger),
+        var kafkaListenerFactory = new KafkaListenerFactory(
             dataFormatSubscriptionConfigurationProvider,
+            this.cancellationTokenSourceProvider,
             this.logger);
+        return new KafkaRouteSubscriber(
+            kafkaListenerFactory,
+            dataFormatSubscriptionConfigurationProvider,
+            this.routeManager);
     }
 }

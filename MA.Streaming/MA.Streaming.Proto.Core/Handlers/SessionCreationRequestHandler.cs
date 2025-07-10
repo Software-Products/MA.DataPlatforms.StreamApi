@@ -31,6 +31,7 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
 {
     private readonly IKeyGeneratorService keyGeneratorService;
     private readonly IPacketWriterHelper packetWriterHelper;
+    private readonly ISessionInfoService sessionInfoService;
     private readonly IRouteInfoProvider routeInfoProvider;
     private readonly ITypeNameProvider typeNameProvider;
 
@@ -38,34 +39,48 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         IRouteInfoProvider routeInfoProvider,
         ITypeNameProvider typeNameProvider,
         IKeyGeneratorService keyGeneratorService,
-        IPacketWriterHelper packetWriterHelper)
+        IPacketWriterHelper packetWriterHelper,
+        ISessionInfoService sessionInfoService)
 
     {
         this.keyGeneratorService = keyGeneratorService;
         this.packetWriterHelper = packetWriterHelper;
+        this.sessionInfoService = sessionInfoService;
         this.routeInfoProvider = routeInfoProvider;
         this.typeNameProvider = typeNameProvider;
     }
 
-    public Task<CreateSessionResponse> Handle(CreateSessionRequest request)
+    public CreateSessionResponse Handle(CreateSessionRequest request)
     {
         SetDefaultType(request);
 
         var sessionKey = this.keyGeneratorService.GenerateStringKey();
-        var topicPartitionOffsets = this.GetTopicPartitionOffsets(request.DataSource);
-
-        var newSessionPacket = CreateNewSessionPacket(request, topicPartitionOffsets);
-        this.WriteNewSessionPacket(request, sessionKey, newSessionPacket);
+        var partitionOffsetsInfo = this.GetTopicPartitionOffsets(request.DataSource);
 
         var sessionInfoPacket = CreateSessionInfoPacket(request);
-        this.WriteSessionInfoPacket(request, sessionKey, sessionInfoPacket);
+        var newSessionPacket = CreateNewSessionPacket(request, partitionOffsetsInfo.mapfields, sessionInfoPacket);
 
-        return Task.FromResult(CreateSuccessfulResponse(newSessionPacket, sessionKey));
-    }
+        var newSessionPacketDto = new NewSessionPacketDto(
+            request.DataSource,
+            partitionOffsetsInfo.topicPartitionOffsetDtos,
+            request.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero,
+            new SessionInfoPacketDto(
+                sessionInfoPacket.Type,
+                sessionInfoPacket.Version,
+                sessionInfoPacket.Identifier,
+                sessionInfoPacket.AssociateSessionKeys,
+                sessionInfoPacket.Details));
 
-    private void WriteSessionInfoPacket(CreateSessionRequest request, string sessionKey, SessionInfoPacket sessionInfoPacket)
-    {
-        this.packetWriterHelper.WriteInfoPacket(sessionKey, this.typeNameProvider.SessionInfoPacketTypeName, sessionInfoPacket.ToByteString(), request.DataSource);
+        var res = this.sessionInfoService.AddNewSession(sessionKey, newSessionPacketDto);
+
+        if (!res.Success)
+        {
+            return CreateUnsuccessfulResponse();
+        }
+
+        this.WriteNewSessionPacket(request, sessionKey, newSessionPacket);
+
+        return CreateSuccessfulResponse(newSessionPacket, sessionKey);
     }
 
     private void WriteNewSessionPacket(CreateSessionRequest request, string sessionKey, NewSessionPacket newSessionPacket)
@@ -78,7 +93,17 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         var response = new CreateSessionResponse
         {
             NewSession = newSessionPacket,
-            SessionKey = sessionKey
+            SessionKey = sessionKey,
+            Success = true
+        };
+        return response;
+    }
+
+    private static CreateSessionResponse CreateUnsuccessfulResponse()
+    {
+        var response = new CreateSessionResponse
+        {
+            Success = false
         };
         return response;
     }
@@ -89,12 +114,24 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         {
             Type = request.Type,
             Version = request.Version,
-            DataSource = request.DataSource
+            DataSource = request.DataSource,
+            AssociateSessionKeys =
+            {
+                request.AssociateSessionKey
+            },
+            Details =
+            {
+                request.Details
+            },
+            Identifier = request.Identifier
         };
         return sessionInfoPacket;
     }
 
-    private static NewSessionPacket CreateNewSessionPacket(CreateSessionRequest request, MapField<string, long> topicPartitionOffsets)
+    private static NewSessionPacket CreateNewSessionPacket(
+        CreateSessionRequest request,
+        MapField<string, long> topicPartitionOffsets,
+        SessionInfoPacket sessionInfoPacket)
     {
         var newSessionPacket = new NewSessionPacket
         {
@@ -103,7 +140,8 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
             {
                 topicPartitionOffsets
             },
-            UtcOffset = request.UtcOffset
+            UtcOffset = request.UtcOffset,
+            SessionInfo = sessionInfoPacket
         };
         return newSessionPacket;
     }
@@ -116,15 +154,18 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         }
     }
 
-    private MapField<string, long> GetTopicPartitionOffsets(string dataSource)
+    private (IReadOnlyList<TopicPartitionOffsetDto> topicPartitionOffsetDtos, MapField<string, long> mapfields) GetTopicPartitionOffsets(string dataSource)
     {
         var result = new MapField<string, long>();
+        var topicPartitionOffsets = new List<TopicPartitionOffsetDto>();
+
         var routeInfos = this.routeInfoProvider.GetRouteInfo(dataSource).Cast<KafkaRouteInfo>().ToList();
         foreach (var routeInfo in routeInfos)
         {
             result.Add($"{routeInfo.Topic}:{routeInfo.Partition}", routeInfo.Offset);
+            topicPartitionOffsets.Add(new TopicPartitionOffsetDto(routeInfo.Topic, routeInfo.Partition, routeInfo.Offset));
         }
 
-        return result;
+        return (topicPartitionOffsets, result);
     }
 }

@@ -15,32 +15,22 @@
 // limitations under the License.
 // </copyright>
 
+using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
-using MA.Streaming.Core;
 using MA.Streaming.OpenData;
 using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
-using Google.Protobuf.WellKnownTypes;
 
 namespace MA.Streaming.Proto.Core.Handlers;
 
-public class ReadPacketResponseStreamWriterHandler : IReadPacketResponseStreamWriterHandler
+public class ReadPacketResponseStreamWriterHandler : ReadPacketResponseStreamWriterHandlerBase<ReadPacketsResponse>, IReadPacketResponseStreamWriterHandler
 {
-    private readonly ConnectionDetailsDto connectionDetailsDto;
     private readonly IServerStreamWriter<ReadPacketsResponse> responseStream;
-    private readonly ServerCallContext context;
-    private readonly IPacketReaderConnectorService connectorService;
-    private readonly bool batchingResponses;
-    private readonly ILogger logger;
-    private readonly AutoResetEvent autoResetEvent;
-    private readonly TimeAndSizeWindowBatchProcessor<PacketReceivedInfoEventArgs>? timeWindowBatchProcessor;
-    private static readonly object WritingLocK = new();
-    private bool started;
 
     public ReadPacketResponseStreamWriterHandler(
         ConnectionDetailsDto connectionDetailsDto,
@@ -50,67 +40,23 @@ public class ReadPacketResponseStreamWriterHandler : IReadPacketResponseStreamWr
         bool batchingResponses,
         ILogger logger,
         AutoResetEvent autoResetEvent)
+        : base(
+            connectionDetailsDto,
+            context,
+            connectorService,
+            batchingResponses,
+            logger,
+            autoResetEvent)
     {
-        this.connectionDetailsDto = connectionDetailsDto;
         this.responseStream = responseStream;
-        this.context = context;
-        this.connectorService = connectorService;
-        this.batchingResponses = batchingResponses;
-        this.logger = logger;
-        this.autoResetEvent = autoResetEvent;
-        this.ConnectionId = connectionDetailsDto.Id;
-        this.connectorService.PacketReceived += this.ConnectorService_PacketReceived;
-        if (batchingResponses)
-        {
-            this.timeWindowBatchProcessor =
-                new TimeAndSizeWindowBatchProcessor<PacketReceivedInfoEventArgs>(this.WriteDataToStreamActionAsync, new CancellationTokenSource());
-        }
     }
 
-    private void ConnectorService_PacketReceived(object? sender, PacketReceivedInfoEventArgs e)
+    public override async Task ConsumeAsync(ReadPacketsResponse data)
     {
-        MetricProviders.NumberOfDataPacketRead.WithLabels(this.ConnectionId.ToString(), e.DataSource, e.Stream)
-            .Inc();
-        if (this.batchingResponses &&
-            this.timeWindowBatchProcessor != null)
-        {
-            this.timeWindowBatchProcessor.Add(e);
-        }
-        else
-        {
-            this.WriteDataToStreamAction(e);
-        }
+        await this.responseStream.WriteAsync(data, this.Context.CancellationToken);
     }
 
-    public long ConnectionId { get; }
-
-    public void StartHandling()
-    {
-        if (this.started)
-        {
-            return;
-        }
-
-        _ = Task.Run(
-            () =>
-            {
-                this.connectorService.Start();
-            },
-            this.context.CancellationToken);
-        this.started = true;
-        this.autoResetEvent.WaitOne();
-    }
-
-    public void StopHandling()
-    {
-        this.connectorService.Stop();
-        this.autoResetEvent.Set();
-        this.HandlingStopped?.Invoke(this, DateTime.Now);
-    }
-
-    public event EventHandler<DateTime>? HandlingStopped;
-
-    private async Task WriteDataToStreamActionAsync(IReadOnlyList<PacketReceivedInfoEventArgs> receivedItems)
+    protected internal override async Task WriteDataToStreamActionAsync(IReadOnlyList<PacketReceivedInfoEventArgs> receivedItems)
     {
         try
         {
@@ -121,61 +67,56 @@ public class ReadPacketResponseStreamWriterHandler : IReadPacketResponseStreamWr
                     Stream = i.Stream,
                     SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
                 }).ToList();
-            await this.responseStream.WriteAsync(
+
+            this.WritingBuffer.AddData(
                 new ReadPacketsResponse
                 {
                     Response =
                     {
                         packetResponses
                     }
-                },
-                this.context.CancellationToken);
-            lock (WritingLocK)
+                });
+            var streamItems = receivedItems.GroupBy(i => i.Stream);
+            foreach (var streamItem in streamItems)
             {
-                var streamItems = receivedItems.GroupBy(i => i.Stream);
-                foreach (var streamItem in streamItems)
-                {
-                    var increment = streamItem.Count();
-                    MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.connectionDetailsDto.DataSource, streamItem.Key)
-                        .Inc(increment);
-                }
+                var increment = streamItem.Count();
+                MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.ConnectionDetailsDto.DataSource, streamItem.Key)
+                    .Inc(increment);
             }
         }
         catch (Exception ex)
         {
             this.StopHandling();
-            this.logger.Error($"exception happened in writing packet response using stream writer. exception {ex}");
+            this.Logger.Error($"exception happened in writing packet response using stream writer. exception {ex}");
+        }
+        finally
+        {
+            await Task.CompletedTask;
         }
     }
 
-    private void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem)
+    protected internal override void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem)
     {
-        lock (WritingLocK)
+        try
         {
-            try
-            {
-                this.responseStream.WriteAsync(
-                    new ReadPacketsResponse
+            this.WritingBuffer.AddData(
+                new ReadPacketsResponse
+                {
+                    Response =
                     {
-                        Response =
+                        new PacketResponse
                         {
-                            new PacketResponse
-                            {
-                                Packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes),
-                                Stream = receivedItem.Stream,  
-                                SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
-                            }
+                            Packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes),
+                            Stream = receivedItem.Stream,
+                            SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
                         }
-                    },
-                    this.context.CancellationToken).Wait(this.context.CancellationToken);
-                MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.connectionDetailsDto.DataSource, receivedItem.Stream)
-                    .Inc();
-            }
-            catch (Exception ex)
-            {
-                this.StopHandling();
-                this.logger.Error($"exception happened in writing packet response for connection {this.ConnectionId} using stream writer. exception {ex}");
-            }
+                    }
+                });
+        }
+        catch (Exception ex)
+        {
+            this.StopHandling();
+            this.Logger.Error($"exception happened in writing packet response for connection {this.ConnectionId} using stream writer. exception {ex}");
         }
     }
 }

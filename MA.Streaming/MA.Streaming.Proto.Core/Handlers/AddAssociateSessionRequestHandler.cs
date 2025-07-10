@@ -20,6 +20,7 @@ using Google.Protobuf;
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
+using MA.Streaming.Contracts;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Core.Abstractions;
@@ -32,20 +33,23 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
     private readonly ILogger logger;
     private readonly IPacketWriterHelper packetWriterHelper;
     private readonly ITypeNameProvider typeNameProvider;
+    private readonly ISessionInfoService sessionInfoService;
 
     public AddAssociateSessionRequestHandler(
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
         ILogger logger,
         IPacketWriterHelper packetWriterHelper,
-        ITypeNameProvider typeNameProvider)
+        ITypeNameProvider typeNameProvider,
+        ISessionInfoService sessionInfoService)
     {
         this.sessionInfoRepository = sessionInfoRepository;
         this.logger = logger;
         this.packetWriterHelper = packetWriterHelper;
         this.typeNameProvider = typeNameProvider;
+        this.sessionInfoService = sessionInfoService;
     }
 
-    public async Task<AddAssociateSessionResponse> AddAssociateSession(AddAssociateSessionRequest request)
+    public AddAssociateSessionResponse AddAssociateSession(AddAssociateSessionRequest request)
     {
         var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
         if (foundSessionDetail == null)
@@ -55,9 +59,23 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
 
         var sessionInfo = CreateSessionInfoPacket(request, foundSessionDetail);
 
+        var res = this.sessionInfoService.UpdateSessionInfo(
+            request.SessionKey,
+            new SessionInfoPacketDto(
+                sessionInfo.Type,
+                sessionInfo.Version,
+                sessionInfo.Identifier,
+                sessionInfo.AssociateSessionKeys,
+                sessionInfo.Details));
+
+        if (!res.Success)
+        {
+            return CreateUnsuccessfulResponse();
+        }
+
         this.WriteInfoPacket(request, sessionInfo, foundSessionDetail);
 
-        return await Task.FromResult(CreateSuccessfulResponse());
+        return CreateSuccessfulResponse();
     }
 
     private static AddAssociateSessionResponse CreateSuccessfulResponse()
@@ -65,6 +83,14 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
         return new AddAssociateSessionResponse
         {
             Success = true
+        };
+    }
+
+    private static AddAssociateSessionResponse CreateUnsuccessfulResponse()
+    {
+        return new AddAssociateSessionResponse
+        {
+            Success = false
         };
     }
 
@@ -93,7 +119,11 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
             },
             DataSource = foundSessionDetail.DataSource,
             Identifier = foundSessionDetail.SessionInfoPacket.Identifier,
-            Version = foundSessionDetail.SessionInfoPacket.Version
+            Version = foundSessionDetail.SessionInfoPacket.Version,
+            Details =
+            {
+                foundSessionDetail.SessionInfoPacket.Details.ToDictionary(i => i.Key, i => i.Value)
+            }
         };
         return sessionInfo;
     }

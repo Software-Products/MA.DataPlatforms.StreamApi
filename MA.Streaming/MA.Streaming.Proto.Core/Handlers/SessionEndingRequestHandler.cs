@@ -31,6 +31,7 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
 {
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository;
     private readonly IPacketWriterHelper packetWriterHelper;
+    private readonly ISessionInfoService sessionInfoService;
     private readonly IRouteInfoProvider routeInfoProvider;
     private readonly ITypeNameProvider typeNameProvider;
 
@@ -38,28 +39,37 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
         IRouteInfoProvider routeInfoProvider,
         ITypeNameProvider typeNameProvider,
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
-        IPacketWriterHelper packetWriterHelper)
+        IPacketWriterHelper packetWriterHelper,
+        ISessionInfoService sessionInfoService)
     {
         this.sessionInfoRepository = sessionInfoRepository;
         this.packetWriterHelper = packetWriterHelper;
+        this.sessionInfoService = sessionInfoService;
         this.routeInfoProvider = routeInfoProvider;
         this.typeNameProvider = typeNameProvider;
     }
 
-    public async Task<EndSessionResponse> Handle(EndSessionRequest request)
+    public EndSessionResponse Handle(EndSessionRequest request)
     {
         var sessionDetailRecord = this.sessionInfoRepository.Get(request.SessionKey);
         if (sessionDetailRecord is null)
         {
-            return await Task.FromResult(new EndSessionResponse());
+            return CreateUnsuccessfulResponse();
         }
 
-        var topicPartitionOffsets = this.GetTopicPartitionOffsets(sessionDetailRecord.DataSource);
+        var partitionOffsetsInfo = this.GetTopicPartitionOffsets(sessionDetailRecord.DataSource);
 
-        var endOfSession = CreateEndOfSessionPacket(sessionDetailRecord, topicPartitionOffsets);
+        var endOfSession = CreateEndOfSessionPacket(sessionDetailRecord, partitionOffsetsInfo.mapfields);
+
+        var res = this.sessionInfoService.EndSession(request.SessionKey, partitionOffsetsInfo.topicPartitionOffsetDtos);
+        if (!res.Success)
+        {
+            return CreateUnsuccessfulResponse();
+        }
+
         this.WritePacket(request, endOfSession, sessionDetailRecord);
 
-        return await Task.FromResult(CreateSuccessfulResponse(endOfSession));
+        return CreateSuccessfulResponse(endOfSession);
     }
 
     private void WritePacket(EndSessionRequest request, EndOfSessionPacket endOfSession, SessionDetailRecord sessionDetailRecord)
@@ -75,7 +85,17 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
     {
         var endSessionResponse = new EndSessionResponse
         {
-            EndSession = endOfSession
+            EndSession = endOfSession,
+            Success = true
+        };
+        return endSessionResponse;
+    }
+
+    private static EndSessionResponse CreateUnsuccessfulResponse()
+    {
+        var endSessionResponse = new EndSessionResponse
+        {
+            Success = false
         };
         return endSessionResponse;
     }
@@ -93,15 +113,18 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
         return endOfSession;
     }
 
-    private MapField<string, long> GetTopicPartitionOffsets(string dataSource)
+    private (IReadOnlyList<TopicPartitionOffsetDto> topicPartitionOffsetDtos, MapField<string, long> mapfields) GetTopicPartitionOffsets(string dataSource)
     {
         var result = new MapField<string, long>();
+        var topicPartitionOffsets = new List<TopicPartitionOffsetDto>();
+
         var routeInfos = this.routeInfoProvider.GetRouteInfo(dataSource).Cast<KafkaRouteInfo>().ToList();
         foreach (var routeInfo in routeInfos)
         {
             result.Add($"{routeInfo.Topic}:{routeInfo.Partition}", routeInfo.Offset);
+            topicPartitionOffsets.Add(new TopicPartitionOffsetDto(routeInfo.Topic, routeInfo.Partition, routeInfo.Offset));
         }
 
-        return result;
+        return (topicPartitionOffsets, result);
     }
 }

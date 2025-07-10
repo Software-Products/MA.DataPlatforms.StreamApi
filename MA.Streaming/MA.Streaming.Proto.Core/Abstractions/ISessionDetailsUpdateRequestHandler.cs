@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface ISessionDetailsUpdateRequestHandler
 {
-    Task<UpdateSessionDetailsResponse> UpdateSessionDetails(UpdateSessionDetailsRequest request);
+    UpdateSessionDetailsResponse UpdateSessionDetails(UpdateSessionDetailsRequest request);
 }

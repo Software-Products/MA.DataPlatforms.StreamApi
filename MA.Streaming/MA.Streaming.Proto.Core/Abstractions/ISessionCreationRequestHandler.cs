@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface ISessionCreationRequestHandler
 {
-    Task<CreateSessionResponse> Handle(CreateSessionRequest request);
+    CreateSessionResponse Handle(CreateSessionRequest request);
 }

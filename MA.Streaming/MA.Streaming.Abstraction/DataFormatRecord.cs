@@ -17,37 +17,39 @@
 
 using MA.Streaming.Contracts;
 
-namespace MA.Streaming.Core.DataFormatManagement;
+namespace MA.Streaming.Abstraction;
 
 public class DataFormatRecord
 {
     public readonly string DataSource;
-    public readonly IReadOnlyList<string> ParametersIdentifiers;
-    public readonly string ParametersIdentifierKey;
+    public readonly IReadOnlyList<string> StringIdentifiers;
+    public readonly string StringIdentifierKey;
     public readonly DataFormatTypeDto DataFormatTypeDto;
-    private readonly List<ulong> identifiers;
+    private readonly HashSet<ulong> identifiers;
 
     public DataFormatRecord(
         string dataSource,
-        string parametersIdentifierKey,
-        IReadOnlyList<string> parametersIdentifiers,
+        string stringIdentifierKey,
+        IReadOnlyList<string> stringIdentifiers,
         DataFormatTypeDto dataFormatTypeDto,
         ulong initialIdentifier)
     {
         this.DataSource = dataSource;
-        this.ParametersIdentifiers = parametersIdentifiers;
-        this.ParametersIdentifierKey = parametersIdentifierKey;
+        this.StringIdentifiers = stringIdentifiers;
+        this.StringIdentifierKey = stringIdentifierKey;
         this.DataFormatTypeDto = dataFormatTypeDto;
-        this.identifiers =
-        [
+        this.identifiers = new HashSet<ulong>
+        {
             initialIdentifier
-        ];
+        };
+        this.Identifiers = this.identifiers.ToList();
     }
 
-    public IReadOnlyList<ulong> Identifiers => this.identifiers;
+    public IReadOnlyList<ulong> Identifiers { get; private set; }
 
     public void AddIdentifier(ulong identifier)
     {
         this.identifiers.Add(identifier);
+        this.Identifiers = this.identifiers.ToList();
     }
 }

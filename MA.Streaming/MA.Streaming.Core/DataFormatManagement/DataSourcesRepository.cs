@@ -25,9 +25,10 @@ public class DataSourcesRepository : IDataSourcesRepository
 {
     private readonly IKafkaTopicHelper kafkaTopicHelper;
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
+
+    private readonly object readWriteLock = new();
     private HashSet<string> trackedTopics = [];
-    private readonly object lockObject = new();
-    private bool initiated = false;
+    private bool initiated;
 
     public DataSourcesRepository(IKafkaTopicHelper kafkaTopicHelper, IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
     {
@@ -37,29 +38,9 @@ public class DataSourcesRepository : IDataSourcesRepository
 
     public event EventHandler<string>? DataSourceAdded;
 
-    public void Initiate()
-    {
-        if (this.initiated)
-        {
-            return;
-        }
-
-        var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicSuffix(
-            this.streamingApiConfiguration.BrokerUrl,
-            Constants.EssentialTopicNameSuffix);
-        this.trackedTopics = essentialTopics
-            .Select(i => i.TopicName.Replace(Constants.EssentialTopicNameSuffix, string.Empty)).Distinct().ToHashSet();
-        this.initiated = true;
-    }
-
-    public IReadOnlyList<string> GetAll()
-    {
-        return [.. this.trackedTopics];
-    }
-
     public void Add(string dataSource)
     {
-        lock (this.lockObject)
+        lock (this.readWriteLock)
         {
             if (!this.initiated)
             {
@@ -72,6 +53,32 @@ public class DataSourcesRepository : IDataSourcesRepository
             }
 
             this.DataSourceAdded?.Invoke(this, dataSource);
+        }
+    }
+
+    public IReadOnlyList<string> GetAll()
+    {
+        lock (this.readWriteLock)
+        {
+            return [.. this.trackedTopics];
+        }
+    }
+
+    public void Initiate()
+    {
+        if (this.initiated)
+        {
+            return;
+        }
+
+        lock (this.readWriteLock)
+        {
+            var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicSuffix(
+                this.streamingApiConfiguration.BrokerUrl,
+                Constants.EssentialTopicNameSuffix);
+            this.trackedTopics = essentialTopics
+                .Select(i => i.TopicName.Replace(Constants.EssentialTopicNameSuffix, string.Empty)).Distinct().ToHashSet();
+            this.initiated = true;
         }
     }
 }

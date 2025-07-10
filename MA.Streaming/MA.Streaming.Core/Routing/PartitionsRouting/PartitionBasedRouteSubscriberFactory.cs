@@ -18,6 +18,7 @@
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
@@ -28,13 +29,16 @@ public class PartitionBasedRouteSubscriberFactory : IRouteSubscriberFactory
 {
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
     private readonly ILogger logger;
+    private readonly IRouteManager routeManager;
 
     public PartitionBasedRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        ILogger logger)
+        ILogger logger,
+        IRouteManager routeManager)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.logger = logger;
+        this.routeManager = routeManager;
     }
 
     public IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto, IRouteBindingInfoRepository routeBindingInfoRepository)
@@ -50,6 +54,6 @@ public class PartitionBasedRouteSubscriberFactory : IRouteSubscriberFactory
                 new CancellationTokenSourceProvider(),
                 this.logger),
             basedSubscriptionConfigurationProvider,
-            this.logger);
+            this.routeManager);
     }
 }

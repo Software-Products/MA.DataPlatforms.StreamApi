@@ -26,10 +26,27 @@ namespace MA.Streaming.IntegrationTests.Base;
 public class KafkaTestsCleanUpFixture : IDisposable
 {
     private const string BrokerUrl = "localhost:9097";
+    private bool disposed;
 
     public void Dispose()
     {
-        new KafkaClearHelper(BrokerUrl).Clear().Wait();
-        StreamingApiClient.Shutdown();
+        this.Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (this.disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            new KafkaClearHelper(BrokerUrl).Clear().Wait();
+            StreamingApiClient.Shutdown();
+        }
+
+        this.disposed = true;
     }
 }

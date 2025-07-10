@@ -74,7 +74,7 @@ public class PartitionBasedRoutingConfigurationProvider : IRoutingConfigurationP
 
         return new RoutingConfiguration(
             new KafkaRoutingConfig(
-                new KafkaPublishingConfig(server: config.BrokerUrl, compressionLevel: -1, compressionType: 4, 0, 10_000_000, int.MaxValue),
+                new KafkaPublishingConfig(config.BrokerUrl, -1, 4, 0, 10_000_000, int.MaxValue),
                 routes,
                 metaData,
                 "dead-Letter"));

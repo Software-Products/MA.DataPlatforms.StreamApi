@@ -39,32 +39,42 @@ internal static class ServerStarter
                     return;
                 }
 
-                var config = JsonSerializer.Deserialize<StreamingApiConfiguration>(
+                var hostConfig = JsonSerializer.Deserialize<HostStreamApiConfiguration>(
                     File.ReadAllText(Environment.CurrentDirectory + AppDefinition.StreamApiConfigFilePath));
 
-                if (config == null)
+                if (hostConfig == null)
                 {
                     Console.WriteLine("invalid config file. app will exit");
                     return;
                 }
 
+                var streamApiConfig = new StreamingApiConfiguration(
+                    hostConfig.StreamCreationStrategy,
+                    hostConfig.BrokerUrl,
+                    hostConfig.PartitionMappings,
+                    hostConfig.StreamApiPort,
+                    hostConfig.IntegrateSessionManagement,
+                    hostConfig.IntegrateDataFormatManagement,
+                    hostConfig.UseRemoteKeyGenerator,
+                    hostConfig.RemoteKeyGeneratorServiceAddress,
+                    hostConfig.BatchingResponses,
+                    hostConfig.InitialisationTimeoutSeconds);
 
-                var server = new Server(config, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
-                _ = Task.Run(
-                    async () =>
+                var server = new Server(streamApiConfig, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+                _ = Task.Run(async () =>
+                {
+                    try
                     {
-                        try
-                        {
-                            await server.Start();
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex.ToString());
-                            Environment.Exit(-1);
-                        }
-                    });
+                        await server.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                        Environment.Exit(-1);
+                    }
+                });
 
-                Console.WriteLine($"Stream Api Server Started on port {config.StreamApiPort}...");
+                Console.WriteLine($"Stream Api Server Started on port {streamApiConfig.StreamApiPort}...");
                 started = true;
             }
         }

@@ -36,15 +36,16 @@ public class NewSessionPacketDtoFromByteFactory : IDtoFromByteFactory<NewSession
         try
         {
             var newSessionPacket = NewSessionPacket.Parser.ParseFrom(content);
+            var sessionInfoPacketDto = CreateSessionInfoDto(newSessionPacket);
             return new NewSessionPacketDto(
                 newSessionPacket.DataSource,
-                newSessionPacket.TopicPartitionOffsets.Select(
-                    i =>
-                    {
-                        var parseInfo = this.ParseTopicPartition(i.Key);
-                        return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
-                    }).ToList(),
-                newSessionPacket.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero);
+                newSessionPacket.TopicPartitionOffsets.Select(i =>
+                {
+                    var parseInfo = ParseTopicPartition(i.Key);
+                    return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
+                }).ToList(),
+                newSessionPacket.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero,
+                sessionInfoPacketDto);
         }
         catch (Exception ex)
         {
@@ -54,16 +55,28 @@ public class NewSessionPacketDtoFromByteFactory : IDtoFromByteFactory<NewSession
         }
     }
 
-    private KeyValuePair<string, int> ParseTopicPartition(string topicPartitionName)
+    private static SessionInfoPacketDto? CreateSessionInfoDto(NewSessionPacket newSessionPacket)
     {
-        if (!topicPartitionName.Contains(":"))
+        var sessionInfoPacket = newSessionPacket.SessionInfo;
+        var sessionInfoPacketDto = sessionInfoPacket != null && !string.IsNullOrEmpty(sessionInfoPacket.DataSource)
+            ? new SessionInfoPacketDto(
+                sessionInfoPacket.Type,
+                sessionInfoPacket.Version,
+                sessionInfoPacket.Identifier,
+                sessionInfoPacket.AssociateSessionKeys,
+                sessionInfoPacket.Details)
+            : null;
+        return sessionInfoPacketDto;
+    }
+
+    private static KeyValuePair<string, int> ParseTopicPartition(string topicPartitionName)
+    {
+        if (!topicPartitionName.Contains(':'))
         {
             return new KeyValuePair<string, int>(topicPartitionName, 0);
         }
-        else
-        {
-            var parts = topicPartitionName.Split(':');
-            return new KeyValuePair<string, int>(parts[0], int.Parse(parts[1]));
-        }
+
+        var parts = topicPartitionName.Split(':');
+        return new KeyValuePair<string, int>(parts[0], int.Parse(parts[1]));
     }
 }

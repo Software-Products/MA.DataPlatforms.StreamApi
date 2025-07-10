@@ -25,11 +25,17 @@ public class NewSessionPacketDto
 
     public readonly TimeSpan OffsetFromUtc;
 
+    public readonly SessionInfoPacketDto? SessionInfoPacketDto;
 
-    public NewSessionPacketDto(string dataSource, IReadOnlyList<TopicPartitionOffsetDto> topicOffsetsPartitions, TimeSpan offsetFromUtc)
+    public NewSessionPacketDto(
+        string dataSource,
+        IReadOnlyList<TopicPartitionOffsetDto> topicOffsetsPartitions,
+        TimeSpan offsetFromUtc,
+        SessionInfoPacketDto? sessionInfoPacketDto)
     {
         this.DataSource = dataSource;
         this.TopicOffsetsPartitions = topicOffsetsPartitions;
         this.OffsetFromUtc = offsetFromUtc;
+        this.SessionInfoPacketDto = sessionInfoPacketDto;
     }
 }

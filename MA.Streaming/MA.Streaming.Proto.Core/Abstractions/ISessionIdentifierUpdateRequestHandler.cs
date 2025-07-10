@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface ISessionIdentifierUpdateRequestHandler
 {
-    Task<UpdateSessionIdentifierResponse> UpdateSessionIdentifier(UpdateSessionIdentifierRequest request);
+    UpdateSessionIdentifierResponse UpdateSessionIdentifier(UpdateSessionIdentifierRequest request);
 }

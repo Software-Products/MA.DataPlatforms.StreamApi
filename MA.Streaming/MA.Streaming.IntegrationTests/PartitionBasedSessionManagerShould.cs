@@ -81,13 +81,13 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         {
             Type = sessionInfoPacketName,
             DataSource = DataSource,
-            Version = Version,
+            Version = Version
         };
 
         const string NewIdentifier = "new_identifier";
         var updateSessionIdentifierPacket = new SessionInfoPacket
         {
-            Identifier = NewIdentifier,
+            Identifier = NewIdentifier
         };
 
         var associatedId1 = Guid.NewGuid().ToString();
@@ -153,9 +153,12 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
                     integrateDataFormatManagement: false,
                     integrateSessionManagement: true));
 
-        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+        StreamingApiClient.Initialise(
+            apiConfigurationProvider.Provide(),
+            new CancellationTokenSourceProvider(),
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(""));
         this.sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
-        new AutoResetEvent(false).WaitOne(5000);
     }
 
     [Fact]
@@ -208,11 +211,9 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         };
 
         //act
-        var createSessionResponse = this.sessionManagementClient.CreateSession(
-            createSessionRequest);
-        new AutoResetEvent(false).WaitOne(1000);
-
+        var createSessionResponse = this.sessionManagementClient.CreateSession(createSessionRequest);
         //assert
+        createSessionResponse.Success.Should().BeTrue();
         createSessionResponse.NewSession.DataSource.Should().Be(DataSource);
         createSessionResponse.NewSession.TopicPartitionOffsets.Count.Should().Be(4);
         IEnumerable<string> expectation = [$"{DataSource}:{0}", $"{DataSource}_essential:{0}", $"{DataSource}:{1}", $"{DataSource}:{2}"];
@@ -224,7 +225,6 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         Guid.Parse(createdSessionKey).Should().NotBeEmpty();
 
         //////////////////////////////////////Get Current Sessions///////////////////////////////////////////////////////////////////
-        new AutoResetEvent(false).WaitOne(1000);
         //arrange
         getCurrentSessionsRequest = new GetCurrentSessionsRequest
         {
@@ -236,6 +236,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
             getCurrentSessionsRequest);
 
         //assert
+        getCurrentSessionsResponse.Success.Should().BeTrue();
         getCurrentSessionsResponse.SessionKeys.Count.Should().Be(2);
         getCurrentSessionsResponse.SessionKeys.OrderBy(i => i).Should().BeEquivalentTo(
             new List<string>
@@ -254,8 +255,9 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
 
         //act
         var getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
-        //assert
 
+        //assert
+        getSessionInfoResponse2.Success.Should().BeTrue();
         getSessionInfoResponse2.Type.Should().Be("Session");
         getSessionInfoResponse2.Version.Should().Be(20);
         getSessionInfoResponse2.AssociateSessionKeys.Count.Should().Be(0);
@@ -275,7 +277,6 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
 
         //act
         var updateSessionIdentifierResponse = this.sessionManagementClient.UpdateSessionIdentifier(updateSessionIdentifierRequest);
-        new AutoResetEvent(false).WaitOne(1000);
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
         //assert
         updateSessionIdentifierResponse.Success.Should().BeTrue();
@@ -294,12 +295,11 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
         var addAssociateSessionRequest = new AddAssociateSessionRequest
         {
             SessionKey = createdSessionKey,
-            AssociateSessionKey = associateSessionKey,
+            AssociateSessionKey = associateSessionKey
         };
 
         //act
         var addAssociateSessionResponse = this.sessionManagementClient.AddAssociateSession(addAssociateSessionRequest);
-        new AutoResetEvent(false).WaitOne(1000);
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
 
         //assert
@@ -325,6 +325,7 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
             {
                 DataSource = DataSource
             });
+        var endAutoResetEvent = new AutoResetEvent(false);
         var endNotificationReceived = false;
         _ = Task.Run(
             async () =>
@@ -334,15 +335,16 @@ public class PartitionBasedSessionManagerShould : IClassFixture<KafkaTestsCleanU
                     var notification = sessionStopNotification.ResponseStream.Current;
                     notification.SessionKey.Should().Be(createdSessionKey);
                     endNotificationReceived = true;
+                    endAutoResetEvent.Set();
                 }
             },
             cancellationToken);
         //act
         var endSessionResponse = this.sessionManagementClient.EndSession(endSessionRequest);
-        new AutoResetEvent(false).WaitOne(1000);
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
-
+        endAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         //assert
+        endSessionResponse.Success.Should().BeTrue();
         endNotificationReceived.Should().BeTrue();
         endSessionResponse.EndSession.DataSource.Should().Be(DataSource);
         endSessionResponse.EndSession.TopicPartitionOffsets.Count.Should().Be(4);

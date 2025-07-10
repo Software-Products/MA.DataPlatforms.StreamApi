@@ -25,12 +25,55 @@ public class SessionInfoPacketDto
     public readonly IReadOnlyList<string> AssociatedKeys;
     public readonly IReadOnlyDictionary<string, string> Details;
 
-    public SessionInfoPacketDto(string type, uint version, string identifier, IReadOnlyList<string> associatedKeys, IReadOnlyDictionary<string, string> details)
+    public SessionInfoPacketDto(
+        string type,
+        uint version,
+        string identifier,
+        IReadOnlyList<string> associatedKeys,
+        IReadOnlyDictionary<string, string> details)
     {
         this.Type = type;
         this.Version = version;
         this.Identifier = identifier;
         this.AssociatedKeys = associatedKeys;
         this.Details = details;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(this.Type, this.Version, this.Identifier, this.AssociatedKeys, this.Details);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not SessionInfoPacketDto other)
+        {
+            return false;
+        }
+
+        return this.Type == other.Type &&
+               this.Version == other.Version &&
+               this.Identifier == other.Identifier &&
+               this.AssociatedKeys.SequenceEqual(other.AssociatedKeys) &&
+               AreDictionariesEqual(this.Details, other.Details);
+    }
+
+    private static bool AreDictionariesEqual(IReadOnlyDictionary<string, string> dict1, IReadOnlyDictionary<string, string> dict2)
+    {
+        if (dict1.Count != dict2.Count)
+        {
+            return false;
+        }
+
+        foreach (var kvp in dict1)
+        {
+            if (!dict2.TryGetValue(kvp.Key, out var value) ||
+                value != kvp.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -15,6 +15,8 @@
 // limitations under the License.
 // </copyright>
 
+using MA.Streaming.Contracts;
+
 namespace MA.Streaming.Abstraction;
 
 public interface ISessionInfoService
@@ -24,6 +26,16 @@ public interface ISessionInfoService
     public event EventHandler<SessionsInfoChangeEventArg>? SessionStopped;
 
     public event EventHandler<SessionsInfoChangeEventArg>? SessionUpdated;
+
+    public event EventHandler<DateTime> ServiceStarted;
+
+    public event EventHandler<DateTime> ServiceStopped;
+
+    (bool Success, string Message) UpdateSessionInfo(string sessionKey, SessionInfoPacketDto sessionInfo);
+
+    (bool Success,string Message) EndSession(string sessionKey, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto);
+
+    (bool Success, string Message) AddNewSession(string sessionKey, NewSessionPacketDto newSessionPacket);
 
     public void Start();
 

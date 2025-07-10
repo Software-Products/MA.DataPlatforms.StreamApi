@@ -70,7 +70,7 @@ public class SessionNotificationManagerService : ISessionNotificationManagerServ
             DataSource = e.DataSource,
             SessionKey = e.SessionKey
         };
-        this.startNotificationStreamWriterService.SendMessage(e.DataSource, getSessionStartNotificationResponse).Wait();
+        this.startNotificationStreamWriterService.SendMessage(e.DataSource, getSessionStartNotificationResponse).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     private void SessionInfoService_SessionStopped(object? sender, SessionsInfoChangeEventArg e)
@@ -80,6 +80,6 @@ public class SessionNotificationManagerService : ISessionNotificationManagerServ
             DataSource = e.DataSource,
             SessionKey = e.SessionKey
         };
-        this.stopNotificationStreamWriterService.SendMessage(e.DataSource, getSessionStopNotificationResponse).Wait();
+        this.stopNotificationStreamWriterService.SendMessage(e.DataSource, getSessionStopNotificationResponse).ConfigureAwait(false).GetAwaiter().GetResult();
     }
 }

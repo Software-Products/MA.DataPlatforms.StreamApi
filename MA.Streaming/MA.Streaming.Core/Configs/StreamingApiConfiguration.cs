@@ -22,25 +22,27 @@ namespace MA.Streaming.Core.Configs;
 public class StreamingApiConfiguration : IStreamingApiConfiguration
 {
     public StreamingApiConfiguration(
-        StreamCreationStrategy streamCreationStrategy,
-        string brokerUrl,
+        StreamCreationStrategy? streamCreationStrategy,
+        string? brokerUrl,
         IReadOnlyList<PartitionMapping>? partitionMappings,
-        int streamApiPort = 13579,
-        bool integrateSessionManagement = true,
-        bool integrateDataFormatManagement = true,
-        bool useRemoteKeyGenerator = false,
-        string remoteKeyGeneratorServiceAddress = "",
-        bool batchingResponses = false)
+        int? streamApiPort = 13579,
+        bool? integrateSessionManagement = true,
+        bool? integrateDataFormatManagement = true,
+        bool? useRemoteKeyGenerator = false,
+        string? remoteKeyGeneratorServiceAddress = "",
+        bool? batchingResponses = false,
+        uint? initialisationTimeoutSeconds = 3)
     {
-        this.StreamCreationStrategy = streamCreationStrategy;
-        this.BrokerUrl = brokerUrl;
-        this.PartitionMappings = partitionMappings;
-        this.BatchingResponses = batchingResponses;
-        this.RemoteKeyGeneratorServiceAddress = remoteKeyGeneratorServiceAddress;
-        this.UseRemoteKeyGenerator = useRemoteKeyGenerator;
-        this.StreamApiPort = streamApiPort;
-        this.IntegrateDataFormatManagement = integrateDataFormatManagement;
-        this.IntegrateSessionManagement = integrateSessionManagement;
+        this.StreamCreationStrategy = streamCreationStrategy ?? StreamCreationStrategy.PartitionBased;
+        this.BrokerUrl = brokerUrl ?? "localhost:9092";
+        this.PartitionMappings = partitionMappings ?? [];
+        this.BatchingResponses = batchingResponses ?? false;
+        this.InitialisationTimeoutSeconds = initialisationTimeoutSeconds ?? 3;
+        this.RemoteKeyGeneratorServiceAddress = remoteKeyGeneratorServiceAddress ?? "";
+        this.UseRemoteKeyGenerator = useRemoteKeyGenerator ?? false;
+        this.StreamApiPort = streamApiPort ?? 13579;
+        this.IntegrateDataFormatManagement = integrateDataFormatManagement ?? true;
+        this.IntegrateSessionManagement = integrateSessionManagement ?? true;
     }
 
     public StreamCreationStrategy StreamCreationStrategy { get; }
@@ -60,4 +62,6 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
     public string RemoteKeyGeneratorServiceAddress { get; }
 
     public bool BatchingResponses { get; }
+
+    public uint InitialisationTimeoutSeconds { get; }
 }

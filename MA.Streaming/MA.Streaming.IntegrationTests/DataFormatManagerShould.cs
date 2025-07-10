@@ -43,11 +43,11 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
     private const string DataSource = "DataFormat_Manager_Test_DataSource";
     private const string Stream1 = "stream1";
     internal const string Stream2 = "stream2";
+    private const string PreExistEventIdentifier = "event1";
     private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
     private readonly ulong preExistEventUlongIdentifier;
     private readonly List<string> preExistParameterIdentifiersList;
     private readonly ulong preExistParamUlongIdentifier;
-    private const string PreExistEventIdentifier = "event1";
 
     public DataFormatManagerShould(KafkaTestsCleanUpFixture _)
     {
@@ -57,7 +57,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         var essentialTopic = essentialTopicNameCreator.Create(DataSource);
         new KafkaClearHelper(BrokerUrl).Clear().Wait();
         StreamingApiClient.Shutdown();
-
+        
         this.preExistParamUlongIdentifier = keyGenerator.GenerateUlongKey();
         this.preExistParameterIdentifiersList =
         [
@@ -103,9 +103,13 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
                     integrateDataFormatManagement: true,
                     integrateSessionManagement: false));
 
-        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+        StreamingApiClient.Initialise(
+            apiConfigurationProvider.Provide(),
+            new CancellationTokenSourceProvider(),
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(""));
+
         this.dataFormatManagerServiceClient = StreamingApiClient.GetDataFormatManagerClient();
-        new AutoResetEvent(false).WaitOne(5000);
     }
 
     [Fact]
@@ -119,7 +123,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         //act
-
         var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
 
         //assert
@@ -137,7 +140,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         //act
-
         var getParameterDataFormatIdResponse = this.dataFormatManagerServiceClient.GetParameterDataFormatId(parameterDataFormatIdRequest);
 
         //assert
@@ -152,7 +154,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         //act
-
         var getEventResponse = this.dataFormatManagerServiceClient.GetEvent(getEventRequest);
 
         //assert
@@ -166,7 +167,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         //act
-
         var getParametersListResponse = this.dataFormatManagerServiceClient.GetParametersList(getParametersListRequest);
 
         //assert
@@ -186,7 +186,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         //act
-
         var eventDataFormatIdResponse = this.dataFormatManagerServiceClient.GetEventDataFormatId(eventDataFormatIdRequest);
 
         //assert
@@ -195,7 +194,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         eventDataFormatIdentifier.Should().BeGreaterThan(0);
 
         //////////////////////////////////////Get New Event Data///////////////////////////////////////////////////////////////////
-        new AutoResetEvent(false).WaitOne(1000);
         //arrange
         var getEventRequest = new GetEventRequest
         {
@@ -210,15 +208,16 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         getEventResponse.Event.Should().Be(NewEvent);
 
         ///////////////////////////////////////Get Id For New Parameter///////////////////////////////////////////////////////////////////////
-        new AutoResetEvent(false).WaitOne(1000);
         //arrange
-        const string NewParameter = "NewParameter";
+        const string NewParameter1 = "NewParameter1";
+        const string NewParameter2 = "NewParameter2";
         var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
         {
             DataSource = DataSource,
             Parameters =
             {
-                NewParameter
+                NewParameter1,
+                NewParameter2
             }
         };
 
@@ -231,7 +230,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
 
         dataFormatIdentifier.Should().BeGreaterThan(0);
         //////////////////////////////////////Get New Parameter Data///////////////////////////////////////////////////////////////////
-        new AutoResetEvent(false).WaitOne(1000);
         //arrange
         var getParametersListRequest = new GetParametersListRequest
         {
@@ -247,7 +245,8 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         getParametersListResponse.Parameters.Should().BeEquivalentTo(
             new List<string>
             {
-                NewParameter
+                NewParameter1,
+                NewParameter2
             });
     }
 

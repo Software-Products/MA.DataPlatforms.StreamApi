@@ -161,7 +161,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
@@ -287,7 +287,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
 
@@ -351,7 +351,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
@@ -475,7 +475,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest1);
         await this.WriteDataPacket(writeDataPacketRequest2);
@@ -554,7 +554,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
@@ -641,7 +641,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         var publishStopWatch = new Stopwatch();
         publishStopWatch.Start();
@@ -715,7 +715,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
@@ -818,7 +818,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne();
+        startListenerAutoResetEvent.WaitOne(5000);
         // Act
         var publishStopWatch = new Stopwatch();
         publishStopWatch.Start();
@@ -829,8 +829,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
 
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        new AutoResetEvent(false).WaitOne(1000);
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(20));
 
         var lstResult = new List<ReadEssentialsResponse>();
         var connectionResponse = await StreamingApiClient.GetConnectionManagerClient().NewConnectionAsync(
@@ -853,7 +852,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                     ExcludeMainStream = false
                 }
             });
-
+        new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(5));
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
             {

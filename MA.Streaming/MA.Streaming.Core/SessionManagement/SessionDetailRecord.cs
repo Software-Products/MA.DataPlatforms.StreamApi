@@ -35,9 +35,10 @@ public class SessionDetailRecord
         string sessionKey,
         string dataSource,
         IReadOnlyList<TopicPartitionOffsetDto> startingOffsetInfo,
-        long mainOffset = 0,
-        long essentialOffset = 0,
-        TimeSpan utcOffset = default)
+        long mainOffset,
+        long essentialOffset,
+        TimeSpan utcOffset,
+        ulong updateVersion)
     {
         this.SessionKey = sessionKey;
         this.DataSource = dataSource;

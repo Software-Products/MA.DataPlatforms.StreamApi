@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface ISessionEndingRequestHandler
 {
-    Task<EndSessionResponse> Handle(EndSessionRequest request);
+    EndSessionResponse Handle(EndSessionRequest request);
 }

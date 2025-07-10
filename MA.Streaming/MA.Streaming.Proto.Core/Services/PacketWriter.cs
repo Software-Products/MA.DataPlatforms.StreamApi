@@ -98,7 +98,7 @@ public sealed class PacketWriter : PacketWriterService.PacketWriterServiceBase
                 canContinue = false;
             }
 
-            Task.Delay(20).Wait();
+            await Task.Delay(20);
         }
 
         return await Task.FromResult(new WriteInfoPacketsResponse());

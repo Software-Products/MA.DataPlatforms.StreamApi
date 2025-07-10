@@ -36,15 +36,14 @@ public class DataFormatConsumingConfigurationProvider : IConsumingConfigurationP
 
     public ConsumingConfiguration Provide()
     {
-        var subscriptionConfiguration = this.routes.Select(
-            i => new KafkaConsumingConfig(
-                new KafkaListeningConfig(
-                    this.StreamApiConfig.BrokerUrl,
-                    Guid.NewGuid().ToString(),
-                    AutoOffsetResetMode.Earliest,
-                    0),
-                i,
-                new KafkaTopicMetaData(i.Topic, 1))
+        var subscriptionConfiguration = this.routes.Select(i => new KafkaConsumingConfig(
+            new KafkaListeningConfig(
+                this.StreamApiConfig.BrokerUrl,
+                Guid.NewGuid().ToString(),
+                AutoOffsetResetMode.Earliest,
+                0),
+            i,
+            new KafkaTopicMetaData(i.Topic, 1))
         ).ToList();
 
         return new ConsumingConfiguration(subscriptionConfiguration);

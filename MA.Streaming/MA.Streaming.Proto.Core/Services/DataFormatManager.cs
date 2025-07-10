@@ -23,7 +23,6 @@ using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
-using MA.Streaming.Core.DataFormatManagement;
 using MA.Streaming.OpenData;
 
 namespace MA.Streaming.Proto.Core.Services;
@@ -32,37 +31,38 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
 {
     private readonly IKeyGeneratorService keyGeneratorService;
     private readonly IPacketWriterConnectorService packetWriterConnectorService;
-    private readonly IInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord> dataFormatByParamIdentifierRepository;
-    private readonly IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> dataFormatByUlongIdentifierRepository;
+    private readonly IDataFormatInfoService dataFormatInfoService;
     private readonly IMapper<Packet, PacketDto> packetDtoMapper;
-    private readonly IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator;
     private readonly ITypeNameProvider typeNameProvider;
     private readonly IDataSourcesRepository dataSourcesRepository;
 
     public DataFormatManager(
         IKeyGeneratorService keyGeneratorService,
         IPacketWriterConnectorService packetWriterConnectorService,
-        IInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord> dataFormatByParamIdentifierRepository,
-        IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> dataFormatByUlongIdentifierRepository,
+        IDataFormatInfoService dataFormatInfoService,
         IMapper<Packet, PacketDto> packetDtoMapper,
-        IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator,
         ITypeNameProvider typeNameProvider,
         IDataSourcesRepository dataSourcesRepository)
     {
         this.keyGeneratorService = keyGeneratorService;
         this.packetWriterConnectorService = packetWriterConnectorService;
-        this.dataFormatByParamIdentifierRepository = dataFormatByParamIdentifierRepository;
-        this.dataFormatByUlongIdentifierRepository = dataFormatByUlongIdentifierRepository;
+        this.dataFormatInfoService = dataFormatInfoService;
+
         this.packetDtoMapper = packetDtoMapper;
-        this.parameterListKeyIdentifierCreator = parameterListKeyIdentifierCreator;
         this.typeNameProvider = typeNameProvider;
         this.dataSourcesRepository = dataSourcesRepository;
     }
 
     public override async Task<GetEventDataFormatIdResponse> GetEventDataFormatId(GetEventDataFormatIdRequest request, ServerCallContext context)
     {
-        var foundItem = this.dataFormatByParamIdentifierRepository.Get(
-            (request.DataSource, request.Event, DataFormatTypeDto.Event));
+        var stringIdentifiers = new List<string>
+        {
+            request.Event
+        };
+        var foundItem = this.dataFormatInfoService.GetByIdentifier(
+            request.DataSource,
+            stringIdentifiers,
+            DataFormatTypeDto.Event);
         if (foundItem != null)
         {
             return await Task.FromResult(
@@ -73,22 +73,24 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         }
 
         this.dataSourcesRepository.Add(request.DataSource);
-        var identifier = this.keyGeneratorService.GenerateUlongKey();
-        var dataFormatDefinitionPacket = CreateEventDefinitionPacket(request.Event, identifier);
+        var dataFormatId = this.keyGeneratorService.GenerateUlongKey();
+        var dataFormatDefinitionPacket = CreateEventDefinitionPacket(request.Event, dataFormatId);
         var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
 
+        this.dataFormatInfoService.Add(request.DataSource, stringIdentifiers, dataFormatId, DataFormatTypeDto.Event);
+        
         this.WriteDataPacket(essentialPacket, request.DataSource);
+
         return await Task.FromResult(
             new GetEventDataFormatIdResponse
             {
-                DataFormatIdentifier = identifier
+                DataFormatIdentifier = dataFormatId
             });
     }
 
     public override async Task<GetEventResponse> GetEvent(GetEventRequest request, ServerCallContext context)
     {
-        var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-            (request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Event));
+        var dataFormatRecord = this.dataFormatInfoService.GetByDataFormatId(request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Event);
 
         if (dataFormatRecord == null)
         {
@@ -98,15 +100,13 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         return await Task.FromResult(
             new GetEventResponse
             {
-                Event = dataFormatRecord.ParametersIdentifiers[0]
+                Event = dataFormatRecord.StringIdentifiers[0]
             });
     }
 
     public override async Task<GetParameterDataFormatIdResponse> GetParameterDataFormatId(GetParameterDataFormatIdRequest request, ServerCallContext context)
     {
-        var parametersIdentifierKey = this.parameterListKeyIdentifierCreator.Create(request.Parameters);
-        var foundItem = this.dataFormatByParamIdentifierRepository.Get(
-            (request.DataSource, parametersIdentifierKey, DataFormatTypeDto.Parameter));
+        var foundItem = this.dataFormatInfoService.GetByIdentifier(request.DataSource, request.Parameters, DataFormatTypeDto.Parameter);
 
         if (foundItem != null)
         {
@@ -119,21 +119,24 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         }
 
         this.dataSourcesRepository.Add(request.DataSource);
-        var identifier = this.keyGeneratorService.GenerateUlongKey();
-        var dataFormatDefinitionPacket = CreateParamListDefinitionPacket(request.Parameters, identifier);
+        var dataFormatId = this.keyGeneratorService.GenerateUlongKey();
+        var dataFormatDefinitionPacket = CreateParamListDefinitionPacket(request.Parameters, dataFormatId);
         var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
+        
+        this.dataFormatInfoService.Add(request.DataSource, request.Parameters, dataFormatId, DataFormatTypeDto.Parameter);
+        
         this.WriteDataPacket(essentialPacket, request.DataSource);
+
         return await Task.FromResult(
             new GetParameterDataFormatIdResponse
             {
-                DataFormatIdentifier = identifier
+                DataFormatIdentifier = dataFormatId
             });
     }
 
     public override async Task<GetParametersListResponse> GetParametersList(GetParametersListRequest request, ServerCallContext context)
     {
-        var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-            (request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Parameter));
+        var dataFormatRecord = this.dataFormatInfoService.GetByDataFormatId(request.DataSource, request.DataFormatIdentifier, DataFormatTypeDto.Parameter);
         if (dataFormatRecord == null)
         {
             return await Task.FromResult(new GetParametersListResponse());
@@ -144,7 +147,7 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
             {
                 Parameters =
                 {
-                    dataFormatRecord.ParametersIdentifiers
+                    dataFormatRecord.StringIdentifiers
                 }
             });
     }

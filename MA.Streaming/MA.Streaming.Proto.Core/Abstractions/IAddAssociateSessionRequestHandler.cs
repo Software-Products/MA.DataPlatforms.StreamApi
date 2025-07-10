@@ -21,5 +21,5 @@ namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface IAddAssociateSessionRequestHandler
 {
-    Task<AddAssociateSessionResponse> AddAssociateSession(AddAssociateSessionRequest request);
+    AddAssociateSessionResponse AddAssociateSession(AddAssociateSessionRequest request);
 }
