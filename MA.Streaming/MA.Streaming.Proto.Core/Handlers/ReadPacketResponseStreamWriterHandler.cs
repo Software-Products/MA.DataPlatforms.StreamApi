@@ -1,6 +1,6 @@
-// <copyright file="ReadPacketResponseStreamWriterHandler.cs" company="McLaren Applied Ltd.">
+// <copyright file="ReadPacketResponseStreamWriterHandler.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 // </copyright>
 
 using Google.Protobuf.WellKnownTypes;
+
 using Grpc.Core;
 
 using MA.Common.Abstractions;
@@ -60,13 +61,12 @@ public class ReadPacketResponseStreamWriterHandler : ReadPacketResponseStreamWri
     {
         try
         {
-            var packetResponses = receivedItems.Select(
-                i => new PacketResponse
-                {
-                    Packet = Packet.Parser.ParseFrom(i.MessageBytes),
-                    Stream = i.Stream,
-                    SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
-                }).ToList();
+            var packetResponses = receivedItems.Select(i => new PacketResponse
+            {
+                Packet = Packet.Parser.ParseFrom(i.MessageBytes),
+                Stream = i.Stream,
+                SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
+            }).ToList();
 
             this.WritingBuffer.AddData(
                 new ReadPacketsResponse

@@ -1,6 +1,6 @@
-// <copyright file="WritePacketRequestStreamReaderHandler.cs" company="McLaren Applied Ltd.">
+// <copyright file="WritePacketRequestStreamReaderHandler.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,38 +53,39 @@ public class WritePacketRequestStreamReaderHandler : IWritePacketRequestStreamRe
         this.Id = id;
     }
 
+    public event EventHandler<DateTime>? HandlingStopped;
+
     public Guid Id { get; }
 
     public void StartHandling()
     {
-        _ = Task.Run(
-            async () =>
+        _ = Task.Run(async () =>
+        {
+            while (!this.context.CancellationToken.IsCancellationRequested)
             {
-                while (!this.context.CancellationToken.IsCancellationRequested)
+                try
                 {
-                    try
+                    await foreach (var writeDataPacketRequest in this.asyncStreamReader.ReadAllAsync())
                     {
-                        await foreach (var writeDataPacketRequest in this.asyncStreamReader.ReadAllAsync())
+                        foreach (var writeDataPacketRequestDto in this.dataPacketsDtoMapper.Map(writeDataPacketRequest))
                         {
-                            foreach (var writeDataPacketRequestDto in this.dataPacketsDtoMapper.Map(writeDataPacketRequest))
-                            {
-                                MetricProviders.NumberOfDataPacketsPublished.WithLabels(
-                                    writeDataPacketRequestDto.DataSource,
-                                    writeDataPacketRequestDto.Stream).Inc();
-                                this.packetWriterConnectorService.WriteDataPacket(writeDataPacketRequestDto);
-                            }
+                            MetricProviders.NumberOfDataPacketsPublished.WithLabels(
+                                writeDataPacketRequestDto.DataSource,
+                                writeDataPacketRequestDto.Stream).Inc();
+                            this.packetWriterConnectorService.WriteDataPacket(writeDataPacketRequestDto);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        this.logger.Error(ex.ToString());
-                        this.StopHandling();
-                        break;
-                    }
-
-                    Task.Delay(5).ConfigureAwait(false).GetAwaiter().GetResult();
                 }
-            });
+                catch (Exception ex)
+                {
+                    this.logger.Error(ex.ToString());
+                    this.StopHandling();
+                    break;
+                }
+
+                Task.Delay(5).ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+        });
 
         this.autoResetEvent.WaitOne();
     }
@@ -94,6 +95,4 @@ public class WritePacketRequestStreamReaderHandler : IWritePacketRequestStreamRe
         this.autoResetEvent.Set();
         this.HandlingStopped?.Invoke(this, DateTime.Now);
     }
-
-    public event EventHandler<DateTime>? HandlingStopped;
 }

@@ -1,6 +1,6 @@
-// <copyright file="StreamWriterHandlerFactory.cs" company="McLaren Applied Ltd.">
+// <copyright file="StreamWriterHandlerFactory.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
     private readonly IStreamingApiConfiguration config;
+
     public StreamWriterHandlerFactory(
         IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler> handlerRepository,
         IRouteSubscriberFactory routeSubscriberFactory,

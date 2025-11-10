@@ -1,6 +1,6 @@
-// <copyright file="TopicBasedSessionManagerShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="TopicBasedSessionManagerShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -159,7 +159,11 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
                     integrateDataFormatManagement: false,
                     integrateSessionManagement: true));
 
-        StreamingApiClient.Initialise(apiConfigurationProvider.Provide(), new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+        StreamingApiClient.Initialise(
+            apiConfigurationProvider.Provide(),
+            new CancellationTokenSourceProvider(),
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(""));
         this.sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
         new AutoResetEvent(false).WaitOne(5000);
     }
@@ -288,7 +292,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         //act
         var updateSessionIdentifierResponse = this.sessionManagementClient.UpdateSessionIdentifier(updateSessionIdentifierRequest);
-        
+
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
         //assert
         updateSessionIdentifierResponse.Success.Should().BeTrue();
@@ -312,7 +316,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
 
         //act
         var addAssociateSessionResponse = this.sessionManagementClient.AddAssociateSession(addAssociateSessionRequest);
-      
+
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
 
         //assert
@@ -354,7 +358,7 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
             cancellationToken);
         //act
         var endSessionResponse = this.sessionManagementClient.EndSession(endSessionRequest);
-        
+
         getSessionInfoResponse2 = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest2);
         endAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         //assert

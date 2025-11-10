@@ -1,6 +1,6 @@
-// <copyright file="StreamingApiClient.cs" company="McLaren Applied Ltd.">
+// <copyright file="StreamingApiClient.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ public static class StreamingApiClient
     private static IServer? server;
     private static GrpcChannel? channel;
 
+    public static event EventHandler<DateTime>? ServiceInitialised;
+
     public static bool Initialised { get; private set; }
 
     public static void Initialise(
@@ -50,18 +52,7 @@ public static class StreamingApiClient
         {
             server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker, loggingDirectoryProvider);
             server.Start().Wait(TimeSpan.FromSeconds(10));
-            channel = GrpcChannel.ForAddress(
-                $"http://localhost:{streamingApiConfiguration.StreamApiPort}",
-                new GrpcChannelOptions
-                {
-                    HttpHandler = new SocketsHttpHandler
-                    {
-                        SslOptions = new SslClientAuthenticationOptions
-                        {
-                            EnabledSslProtocols = SslProtocols.None
-                        }
-                    }
-                });
+            SetupGrpcChannel(streamingApiConfiguration);
         }
         catch (Exception ex)
         {
@@ -70,6 +61,33 @@ public static class StreamingApiClient
         }
 
         Initialised = true;
+        ServiceInitialised?.Invoke(null, DateTime.UtcNow);
+    }
+
+    public static async Task InitialiseAsync(
+        IStreamingApiConfiguration streamingApiConfiguration,
+        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
+        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
+        ILoggingDirectoryProvider loggingDirectoryProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (Initialised)
+            {
+                return;
+            }
+
+            server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker, loggingDirectoryProvider);
+            await server.StartAsync(cancellationToken);
+            SetupGrpcChannel(streamingApiConfiguration);
+            Initialised = true;
+            ServiceInitialised?.Invoke(null, DateTime.UtcNow);
+        }
+        catch (OperationCanceledException)
+        {
+            Shutdown();
+        }
     }
 
     public static object? GetService(Type serviceType)
@@ -125,7 +143,23 @@ public static class StreamingApiClient
         if (!Initialised)
         {
             throw new InvalidOperationException(
-                "StreamApi StreamingApiClient has not been initialised. Please call StreamingApiClient.Initialise() before using the API.");
+                "StreamApi StreamingApiClient has not been initialised. Please call StreamingApiClient.Initialise() or StreamingApiClient.InitialiseAsync() before using the API.");
         }
+    }
+
+    private static void SetupGrpcChannel(IStreamingApiConfiguration streamingApiConfiguration)
+    {
+        channel = GrpcChannel.ForAddress(
+            $"http://localhost:{streamingApiConfiguration.StreamApiPort}",
+            new GrpcChannelOptions
+            {
+                HttpHandler = new SocketsHttpHandler
+                {
+                    SslOptions = new SslClientAuthenticationOptions
+                    {
+                        EnabledSslProtocols = SslProtocols.None
+                    }
+                }
+            });
     }
 }

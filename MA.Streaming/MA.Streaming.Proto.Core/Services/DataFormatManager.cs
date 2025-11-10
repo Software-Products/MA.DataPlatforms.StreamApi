@@ -1,6 +1,6 @@
-// <copyright file="DataFormatManager.cs" company="McLaren Applied Ltd.">
+// <copyright file="DataFormatManager.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
 
         this.dataFormatInfoService.Add(request.DataSource, stringIdentifiers, dataFormatId, DataFormatTypeDto.Event);
-        
+
         this.WriteDataPacket(essentialPacket, request.DataSource);
 
         return await Task.FromResult(
@@ -122,9 +122,9 @@ public sealed class DataFormatManager : DataFormatManagerService.DataFormatManag
         var dataFormatId = this.keyGeneratorService.GenerateUlongKey();
         var dataFormatDefinitionPacket = CreateParamListDefinitionPacket(request.Parameters, dataFormatId);
         var essentialPacket = this.CreateEssentialPacket(dataFormatDefinitionPacket);
-        
+
         this.dataFormatInfoService.Add(request.DataSource, request.Parameters, dataFormatId, DataFormatTypeDto.Parameter);
-        
+
         this.WriteDataPacket(essentialPacket, request.DataSource);
 
         return await Task.FromResult(

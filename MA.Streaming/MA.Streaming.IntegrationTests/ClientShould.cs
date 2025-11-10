@@ -1,6 +1,6 @@
-// <copyright file="ClientShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="ClientShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,6 +54,8 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
     public void BeInitialisedAfterInitialiseIsCalled()
     {
         // Arrange
+        var initialisedEventCounter = 0;
+        StreamingApiClient.ServiceInitialised += (_, _) => initialisedEventCounter++;
         // Act
         StreamingApiClient.Initialise(
             this.streamingApiConfiguration,
@@ -62,13 +64,7 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
             this.loggingDirectoryProvider);
         // Assert
         StreamingApiClient.Initialised.Should().BeTrue();
-    }
-
-    private static ICancellationTokenSourceProvider CreateCancellationTokenSourceProvider()
-    {
-        var cancellationTokenSourceProvider = Substitute.For<ICancellationTokenSourceProvider>();
-        cancellationTokenSourceProvider.Provide().Returns(new CancellationTokenSource());
-        return cancellationTokenSourceProvider;
+        initialisedEventCounter.Should().Be(1);
     }
 
     [Fact]
@@ -193,5 +189,66 @@ public class ClientShould : IClassFixture<StreamApiTestsCleanUpFixture>
         var act = StreamingApiClient.GetPacketWriterClient;
         // Assert
         act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task BeInitialisedWhenInitialisedAsyncIsCalled()
+    {
+        // Arrange
+        var initialisedEventCounter = 0;
+        StreamingApiClient.ServiceInitialised += (_, _) => initialisedEventCounter++;
+        var cts = new CancellationTokenSource();
+
+        // Act
+        await StreamingApiClient.InitialiseAsync(
+            this.streamingApiConfiguration,
+            CreateCancellationTokenSourceProvider(),
+            this.kafkaChecker,
+            this.loggingDirectoryProvider,
+            cts.Token);
+
+        // Assert
+        StreamingApiClient.Initialised.Should().BeTrue();
+        initialisedEventCounter.Should().Be(1);
+    }
+
+    [Fact]
+    public void NotBeInitialisedWhenInitialisedAsyncIsCancelled()
+    {
+        // Arrange
+        var initialisedEventCounter = 0;
+        this.kafkaChecker.Check(Arg.Any<string>()).Returns(false);
+        var autoResetEvent = new AutoResetEvent(false);
+        StreamingApiClient.ServiceInitialised += (_, _) =>
+        {
+            initialisedEventCounter++;
+            autoResetEvent.Set();
+        };
+        var cts = new CancellationTokenSource();
+
+        // Act
+        Task.Run(async () =>
+        {
+            await StreamingApiClient.InitialiseAsync(
+                this.streamingApiConfiguration,
+                CreateCancellationTokenSourceProvider(),
+                this.kafkaChecker,
+                this.loggingDirectoryProvider,
+                cts.Token);
+        });
+
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(1));
+        cts.Cancel();
+
+        // Assert
+        StreamingApiClient.Initialised.Should().BeFalse();
+        initialisedEventCounter.Should().Be(0);
+    }
+
+    private static ICancellationTokenSourceProvider CreateCancellationTokenSourceProvider()
+    {
+        var cancellationTokenSourceProvider = Substitute.For<ICancellationTokenSourceProvider>();
+        cancellationTokenSourceProvider.Provide().Returns(new CancellationTokenSource());
+        return cancellationTokenSourceProvider;
     }
 }

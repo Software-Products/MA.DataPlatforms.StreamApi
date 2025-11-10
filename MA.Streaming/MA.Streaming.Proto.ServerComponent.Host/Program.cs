@@ -1,6 +1,6 @@
-// <copyright file="Program.cs" company="McLaren Applied Ltd.">
+// <copyright file="Program.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,17 +46,16 @@ internal static class Program
 
             Console.WriteLine("Listening for requests...");
 
-            _ = Task.Run(
-                async () =>
+            _ = Task.Run(async () =>
+            {
+                while (true)
                 {
-                    while (true)
-                    {
-                        var context = await listener.GetContextAsync();
-                        var request = context.Request;
-                        var response = context.Response;
-                        await RequestHandler.Handle(context, response, request);
-                    }
-                });
+                    var context = await listener.GetContextAsync();
+                    var request = context.Request;
+                    var response = context.Response;
+                    await RequestHandler.Handle(context, response, request);
+                }
+            });
         }
         else
         {

@@ -1,6 +1,6 @@
-// <copyright file="ReadPacketResponseStreamWriterHandlerBase.cs" company="McLaren Applied Ltd.">
+// <copyright file="ReadPacketResponseStreamWriterHandlerBase.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,27 +59,15 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
             this.TimeWindowBatchProcessor =
                 new TimeAndSizeWindowBatchProcessor<PacketReceivedInfoEventArgs>(this.WriteDataToStreamActionAsync, new CancellationTokenSource());
         }
-        this.WritingBuffer = new GenericBuffer<T>(this);
-    }
 
-    private void ConnectorService_PacketReceived(object? sender, PacketReceivedInfoEventArgs e)
-    {
-        MetricProviders.NumberOfDataPacketRead.WithLabels(this.ConnectionId.ToString(), e.DataSource, e.Stream)
-            .Inc();
-        if (this.BatchingResponses &&
-            this.TimeWindowBatchProcessor != null)
-        {
-            this.TimeWindowBatchProcessor.Add(e);
-        }
-        else
-        {
-            this.WriteDataToStreamAction(e);
-        }
+        this.WritingBuffer = new GenericBuffer<T>(this);
     }
 
     public event EventHandler<DateTime>? HandlingStopped;
 
     public long ConnectionId { get; }
+
+    public abstract Task ConsumeAsync(T data);
 
     public void StartHandling()
     {
@@ -109,7 +97,18 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
 
     protected internal abstract void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem);
 
-    public abstract Task ConsumeAsync(T data);
-
-
+    private void ConnectorService_PacketReceived(object? sender, PacketReceivedInfoEventArgs e)
+    {
+        MetricProviders.NumberOfDataPacketRead.WithLabels(this.ConnectionId.ToString(), e.DataSource, e.Stream)
+            .Inc();
+        if (this.BatchingResponses &&
+            this.TimeWindowBatchProcessor != null)
+        {
+            this.TimeWindowBatchProcessor.Add(e);
+        }
+        else
+        {
+            this.WriteDataToStreamAction(e);
+        }
+    }
 }

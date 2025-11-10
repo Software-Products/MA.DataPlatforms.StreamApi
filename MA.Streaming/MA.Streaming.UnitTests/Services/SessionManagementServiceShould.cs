@@ -1,6 +1,6 @@
-// <copyright file="SessionManagementServiceShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="SessionManagementServiceShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -156,7 +156,6 @@ public class SessionManagementServiceShould
 
         // Act
         var endSessionResponse = await this.sessionManager.EndSession(request, context);
-
 
         // Assert
         endSessionResponse.Should().NotBeNull();
@@ -431,7 +430,6 @@ public class SessionManagementServiceShould
         };
         var context = Substitute.For<ServerCallContext>();
         this.sessionInfoService.UpdateSessionInfo(Arg.Any<string>(), Arg.Any<SessionInfoPacketDto>()).Returns((true, "ok"));
-
 
         // Act
         var addAssociateSessionResponse = await this.sessionManager.AddAssociateSession(request, context);

@@ -1,6 +1,6 @@
-// <copyright file="DataFormatManagerShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="DataFormatManagerShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         var essentialTopic = essentialTopicNameCreator.Create(DataSource);
         new KafkaClearHelper(BrokerUrl).Clear().Wait();
         StreamingApiClient.Shutdown();
-        
+
         this.preExistParamUlongIdentifier = keyGenerator.GenerateUlongKey();
         this.preExistParameterIdentifiersList =
         [

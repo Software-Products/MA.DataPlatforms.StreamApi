@@ -1,6 +1,6 @@
-// <copyright file="CreateDataPacketHelper.cs" company="McLaren Applied Ltd.">
+// <copyright file="CreateDataPacketHelper.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,17 +17,19 @@
 
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
+
 using Xunit.Abstractions;
 
 namespace MA.Streaming.IntegrationTests.Helper
 {
     public class CreateDataPacketHelper
     {
-        private string? dataSource;
-        private DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManager;
+        private readonly string? dataSource;
+        private readonly DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManager;
         private readonly ITestOutputHelper outputHelper;
 
-        public CreateDataPacketHelper(string dataSource, DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerClient, ITestOutputHelper outputHelper) { 
+        public CreateDataPacketHelper(string dataSource, DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerClient, ITestOutputHelper outputHelper)
+        {
             this.dataSource = dataSource;
             this.dataFormatManager = dataFormatManagerClient;
             this.outputHelper = outputHelper;
@@ -74,18 +76,22 @@ namespace MA.Streaming.IntegrationTests.Helper
                 {
                     DataFormatIdentifier = dataFormatIdentifier.DataFormatIdentifier
                 },
-                Timestamps = { 1732899802000123456, 1732899902000123456 },
-                Rows =
-            {
-                new SampleRow
+                Timestamps =
                 {
-                    DoubleSamples = row1Samples
+                    1732899802000123456,
+                    1732899902000123456
                 },
-                new SampleRow
+                Rows =
                 {
-                    DoubleSamples = row2Samples
+                    new SampleRow
+                    {
+                        DoubleSamples = row1Samples
+                    },
+                    new SampleRow
+                    {
+                        DoubleSamples = row2Samples
+                    }
                 }
-            }
             };
 
             var info = await this.dataFormatManager.GetParametersListAsync(
@@ -102,6 +108,7 @@ namespace MA.Streaming.IntegrationTests.Helper
                 {
                     throw new InvalidOperationException("data format info not found");
                 }
+
                 retryCounter++;
                 info = await this.dataFormatManager.GetParametersListAsync(
                     new GetParametersListRequest
@@ -123,14 +130,13 @@ namespace MA.Streaming.IntegrationTests.Helper
             {
                 throw new InvalidOperationException("Data format manager is null which shouldn't be");
             }
+
             var getParameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
             {
                 DataSource = this.dataSource,
             };
             getParameterDataFormatIdRequest.Parameters.Add(parameters);
             var dataFormatIdentifier = await this.dataFormatManager.GetParameterDataFormatIdAsync(getParameterDataFormatIdRequest);
-
-
 
             var columns = new List<SampleColumn>();
 
@@ -152,7 +158,7 @@ namespace MA.Streaming.IntegrationTests.Helper
                             new DoubleSample
                             {
                                 Status = DataStatus.Valid,
-                                Value = 100*(i+1)
+                                Value = 100 * (i + 1)
                             }
                         }
                     }
@@ -186,6 +192,7 @@ namespace MA.Streaming.IntegrationTests.Helper
                 {
                     throw new InvalidOperationException("data format info not found");
                 }
+
                 retryCounter++;
                 info = await this.dataFormatManager.GetParametersListAsync(
                     new GetParametersListRequest
@@ -207,14 +214,13 @@ namespace MA.Streaming.IntegrationTests.Helper
             {
                 throw new InvalidOperationException("Data format manager is null which shouldn't be");
             }
+
             var getParameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
             {
                 DataSource = this.dataSource,
             };
             getParameterDataFormatIdRequest.Parameters.Add(parameters);
             var dataFormatIdentifier = await this.dataFormatManager.GetParameterDataFormatIdAsync(getParameterDataFormatIdRequest);
-
-
 
             var columns = new List<SampleColumn>();
 
@@ -236,13 +242,12 @@ namespace MA.Streaming.IntegrationTests.Helper
                             new DoubleSample
                             {
                                 Status = DataStatus.Valid,
-                                Value = 100*(i+1)
-                            }
-                            ,
+                                Value = 100 * (i + 1)
+                            },
                             new DoubleSample
                             {
                                 Status = DataStatus.Valid,
-                                Value = 10*(i+1)
+                                Value = 10 * (i + 1)
                             }
                         }
                     }
@@ -257,7 +262,11 @@ namespace MA.Streaming.IntegrationTests.Helper
                     DataFormatIdentifier = dataFormatIdentifier.DataFormatIdentifier
                 },
                 StartTime = 1732899679000123456,
-                Intervals = { 500, 450 },
+                Intervals =
+                {
+                    500,
+                    450
+                },
             };
 
             synchroDataPacket.Column.Add(columns);
@@ -313,7 +322,12 @@ namespace MA.Streaming.IntegrationTests.Helper
                     DataFormatIdentifier = dataFormatIdentifier.DataFormatIdentifier
                 },
                 Timestamp = 1732898779000123456,
-                RawValues = { 209.4, 325.3, 0 }
+                RawValues =
+                {
+                    209.4,
+                    325.3,
+                    0
+                }
             };
 
             var info = await this.dataFormatManager.GetEventAsync(
@@ -328,11 +342,11 @@ namespace MA.Streaming.IntegrationTests.Helper
             {
                 retryCounter++;
                 info = await this.dataFormatManager.GetEventAsync(
-                            new GetEventRequest
-                            {
-                                DataFormatIdentifier = dataFormatIdentifier.DataFormatIdentifier,
-                                DataSource = this.dataSource
-                            });
+                    new GetEventRequest
+                    {
+                        DataFormatIdentifier = dataFormatIdentifier.DataFormatIdentifier,
+                        DataSource = this.dataSource
+                    });
                 if (retryCounter == 5)
                 {
                     throw new InvalidOperationException("data format info not found");
@@ -344,6 +358,5 @@ namespace MA.Streaming.IntegrationTests.Helper
 
             return eventPacket;
         }
-
     }
 }

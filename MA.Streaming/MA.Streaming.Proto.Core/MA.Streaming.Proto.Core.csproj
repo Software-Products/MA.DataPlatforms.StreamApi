@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Title>MA.Streaming.Proto.Core</Title>
-		<Company>McLaren Applied</Company>
+		<Company>Motion Applied</Company>
 		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 		<Description>Core libraries for the MA Stream API.</Description>
-		<Authors>McLaren Applied</Authors>
+		<Authors>Motion Applied</Authors>
 		<RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
 	</PropertyGroup>
 
@@ -22,14 +22,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="MA.Streaming.Protocol.OpenData.Proto" Version="1.3.5.3" GeneratePathProperty="true">
+		<PackageReference Include="MA.Streaming.Protocol.OpenData.Proto" Version="1.3.6.17" GeneratePathProperty="true">
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
 		<Protobuf Include="$(PkgMA_Streaming_Protocol_OpenData_Proto)/ma/streaming/**/*.proto" GrpcServices="None" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_Protocol_OpenData_Proto)" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="MA.Streaming.API.Proto" Version="1.3.5.3" GeneratePathProperty="true">
+		<PackageReference Include="MA.Streaming.API.Proto" Version="1.3.6.17" GeneratePathProperty="true">
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
 		<Protobuf Include="$(PkgMA_Streaming_API_Proto)/ma/streaming/**/*.proto" GrpcServices="Both" CompileOutputs="true" AdditionalImportDirs="$(PkgMA_Streaming_API_Proto);$(PkgMA_Streaming_Protocol_OpenData_Proto)" ProtoRoot="$(PkgMA_Streaming_API_Proto)" />

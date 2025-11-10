@@ -1,6 +1,6 @@
-// <copyright file="TopicBasedPacketWriteAndReadShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="TopicBasedPacketWriteAndReadShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,12 +47,12 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
     private const string DataSource = "TopicBased_Not_Batched_SampleDataSource";
     private const string SessionKey = " TopicBasedPacketWriteAndBatchReadShould_Session_Key";
     private const string SampleType = "SampleType";
-    private readonly ITestOutputHelper outputHelper;
     private static PacketWriterService.PacketWriterServiceClient? packetWriter;
     private static AsyncServerStreamingCall<ReadPacketsResponse>? receiveStream;
     private static PacketReaderService.PacketReaderServiceClient? packetReader;
     private static NewConnectionResponse? receiveConnection;
     private static bool initialised;
+    private readonly ITestOutputHelper outputHelper;
 
     public TopicBasedPacketWriteAndReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
     {
@@ -73,7 +73,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
             integrateSessionManagement: false,
             batchingResponses: false);
         var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
-        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(),new LoggingDirectoryProvider(""));
+        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
         packetWriter = StreamingApiClient.GetPacketWriterClient();
         packetReader = StreamingApiClient.GetPacketReaderClient();
         receiveConnection = StreamingApiClient.GetConnectionManagerClient().NewConnection(
@@ -146,11 +146,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -209,11 +208,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup2Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup2Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -272,11 +270,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -594,23 +591,6 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         receiveCount.Should().Be(1000);
     }
 
-    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
-    {
-        if (packetWriter is null)
-        {
-            throw new InvalidOperationException("test not initialised properly");
-        }
-
-        var publishStopWatch = new Stopwatch();
-        publishStopWatch.Start();
-        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
-        publishStopWatch.Stop();
-        if (log)
-        {
-            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        }
-    }
-
     [Fact]
     public async Task Publish_One_Essential_DataPacket_Read_All_Essentials_Should_Deliver_It_And_Packet_Should_Be_Received_On_Defined_DataSource_Stream_Too()
     {
@@ -652,12 +632,11 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content) &&
-                                              packetResponse.Packet.IsEssential))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content) &&
+                                                               packetResponse.Packet.IsEssential))
                     {
                         continue;
                     }
@@ -673,7 +652,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
-       
+
         // Act
         var result = packetReader.ReadEssentials(
             new ReadEssentialsRequest
@@ -684,6 +663,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         {
             lstResult.Add(essentialDataResponse);
         }
+
         tokenSource.Cancel();
         //Assert
         assertResult.Should().BeTrue();
@@ -819,5 +799,22 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         //assert
         receiveCount.Should().Be(1000);
         lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1000);
+    }
+
+    private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
+    {
+        if (packetWriter is null)
+        {
+            throw new InvalidOperationException("test not initialised properly");
+        }
+
+        var publishStopWatch = new Stopwatch();
+        publishStopWatch.Start();
+        await packetWriter.WriteDataPacketAsync(writeDataPacketRequest);
+        publishStopWatch.Stop();
+        if (log)
+        {
+            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
+        }
     }
 }

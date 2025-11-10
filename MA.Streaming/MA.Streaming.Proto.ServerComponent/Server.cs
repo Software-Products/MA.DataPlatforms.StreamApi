@@ -1,6 +1,6 @@
-// <copyright file="Server.cs" company="McLaren Applied Ltd.">
+// <copyright file="Server.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,10 +65,17 @@ public sealed class Server : IServer
 
     public Task Start()
     {
-        return this.StartInternal().ContinueWith(
+        var cancellationToken = this.cancellationTokenSourceProvider.Provide().Token;
+        return this.StartInternal(cancellationToken).ContinueWith(
             tsk => tsk.IsCompletedSuccessfully && this.webApp?.Urls.Count == ExpectedUrlCount
                 ? Task.CompletedTask
-                : throw tsk.Exception ?? new Exception("Start server failed"));
+                : throw tsk.Exception ?? new Exception("Start server failed"),
+            cancellationToken);
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        return this.StartInternal(cancellationToken);
     }
 
     public Task Stop()
@@ -81,7 +88,7 @@ public sealed class Server : IServer
         return webAppCopy?.DisposeAsync().AsTask() ?? Task.CompletedTask;
     }
 
-    private Task StartInternal()
+    private async Task StartInternal(CancellationToken cancellationToken)
     {
         // Create the web app builder
         // This currently uses the port defined in the configuration the default endpoints of http://localhost:5000 
@@ -112,7 +119,8 @@ public sealed class Server : IServer
 
         var logger = this.webApp.Services.GetService<ILogger>();
         var kafkaAvailable = false;
-        while (!kafkaAvailable)
+        while (!kafkaAvailable &&
+               !cancellationToken.IsCancellationRequested)
         {
             if (this.kafkaBrokerAvailabilityChecker.Check(this.streamingApiConfiguration.BrokerUrl))
             {
@@ -121,7 +129,13 @@ public sealed class Server : IServer
             }
 
             logger?.Error("Kafka is not available will retry in 5 seconds");
-            Task.Delay(TimeSpan.FromSeconds(5)).Wait();
+            await Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None).WaitAsync(CancellationToken.None);
+        }
+
+        if (!kafkaAvailable)
+        {
+            logger?.Error("Kafka is not available, stopping the server start up");
+            return;
         }
 
         if (this.streamingApiConfiguration.IntegrateDataFormatManagement)
@@ -131,13 +145,14 @@ public sealed class Server : IServer
 
         if (!this.streamingApiConfiguration.IntegrateSessionManagement)
         {
-            return this.webApp.StartAsync();
+            await this.webApp.StartAsync(cancellationToken);
+            return;
         }
 
         this.webApp.Services.GetService<ISessionInfoService>()?.Start();
         this.webApp.Services.GetService<ISessionNotificationManagerService>()?.Start();
 
-        return this.webApp.StartAsync();
+        await this.webApp.StartAsync(cancellationToken);
     }
 
     private void ConfigureListenOptions(KestrelServerOptions options)
