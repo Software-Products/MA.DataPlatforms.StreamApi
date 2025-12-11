@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Title>Ma.Streaming.PrometheusMetrics</Title>
-    <Authors>McLaren Applied</Authors>
-    <Company>McLaren Applied</Company>
+    <Authors>Motion Applied</Authors>
+    <Company>Motion Applied</Company>
     <Description>Library for providing prometheus metrics for the Stream API </Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="prometheus-net" Version="8.2.1" />
+    <PackageReference Include="prometheus-net" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

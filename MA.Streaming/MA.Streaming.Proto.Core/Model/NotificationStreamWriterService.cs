@@ -1,6 +1,6 @@
-// <copyright file="NotificationStreamWriterService.cs" company="McLaren Applied Ltd.">
+// <copyright file="NotificationStreamWriterService.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 
 using Grpc.Core;
 
-using MA.Common;
 using MA.Streaming.Core;
 using MA.Streaming.Proto.Core.Abstractions;
 

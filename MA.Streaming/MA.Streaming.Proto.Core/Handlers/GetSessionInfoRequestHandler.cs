@@ -1,6 +1,6 @@
-// <copyright file="GetSessionInfoRequestHandler.cs" company="McLaren Applied Ltd.">
+// <copyright file="GetSessionInfoRequestHandler.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,10 @@ public class GetSessionInfoRequestHandler : IGetSessionInfoRequestHandler
         var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
         if (foundSessionDetail == null)
         {
-            return new GetSessionInfoResponse { Success = false };
+            return new GetSessionInfoResponse
+            {
+                Success = false
+            };
         }
 
         var streams = this.streamsProvider.Provide(foundSessionDetail.DataSource);

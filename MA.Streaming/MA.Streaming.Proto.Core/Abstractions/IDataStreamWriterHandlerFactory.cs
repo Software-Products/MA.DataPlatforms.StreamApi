@@ -1,6 +1,6 @@
-// <copyright file="IStreamWriterHandlerFactory.cs" company="McLaren Applied Ltd.">
+// <copyright file="IDataStreamWriterHandlerFactory.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 // </copyright>
 
 using Grpc.Core;
+
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
-using MA.Streaming.Core.DataFormatManagement;
 
 namespace MA.Streaming.Proto.Core.Abstractions;
 
@@ -30,5 +30,5 @@ public interface IDataStreamWriterHandlerFactory
         IServerStreamWriter<ReadDataPacketsResponse> serverStreamWriter,
         ServerCallContext context,
         IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository
-        );
+    );
 }

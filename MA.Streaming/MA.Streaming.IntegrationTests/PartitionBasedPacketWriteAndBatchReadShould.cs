@@ -1,6 +1,6 @@
-// <copyright file="PartitionBasedPacketWriteAndBatchReadShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="PartitionBasedPacketWriteAndBatchReadShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -146,11 +146,10 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -209,11 +208,10 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup2Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup2Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -272,11 +270,10 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -336,11 +333,10 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -699,12 +695,11 @@ public class PartitionBasedPacketWriteAndBatchReadShould : IClassFixture<KafkaTe
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == SampleType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content) &&
-                                              packetResponse.Packet.IsEssential))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == SampleType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content) &&
+                                                               packetResponse.Packet.IsEssential))
                     {
                         continue;
                     }

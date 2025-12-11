@@ -1,6 +1,6 @@
-// <copyright file="TopicBasedDataPacketWriteAndReadShould.cs" company="McLaren Applied Ltd.">
+// <copyright file="TopicBasedDataPacketWriteAndReadShould.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@
 // </copyright>
 
 using System.Diagnostics;
+
 using FluentAssertions;
 
 using Google.Protobuf;
+
 using Grpc.Core;
 
 using MA.Streaming.Abstraction;
@@ -56,11 +58,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
     private static DataFormatManagerService.DataFormatManagerServiceClient? dataFormatManager;
     private static ConnectionManagerService.ConnectionManagerServiceClient? connectionManager;
     private static bool initialised;
+    private readonly CreateDataPacketHelper? createDataPacketHelper;
+    private readonly ITestOutputHelper outputHelper;
 
     private AsyncServerStreamingCall<ReadDataPacketsResponse>? receiveStream;
     private NewConnectionResponse? receiveConnection;
-    private CreateDataPacketHelper? createDataPacketHelper;
-    private readonly ITestOutputHelper outputHelper;
 
     public TopicBasedDataPacketWriteAndReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
     {
@@ -71,6 +73,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             {
                 throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
             }
+
             this.createDataPacketHelper = new CreateDataPacketHelper(DataSource, dataFormatManager, this.outputHelper);
             return;
         }
@@ -105,10 +108,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var runSessionId = Guid.NewGuid().ToString();
-        ConfigureReceiveStream(runSessionId);
 
-        var parameterIdentifiers = new List<string> { "IncludeParameter" };
+        var runSessionId = Guid.NewGuid().ToString();
+        this.ConfigureReceiveStream(runSessionId);
+
+        var parameterIdentifiers = new List<string>
+        {
+            "IncludeParameter"
+        };
         PeriodicDataPacket periodicDataPacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(parameterIdentifiers);
 
         var content = periodicDataPacket.ToByteString();
@@ -147,11 +154,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 {
                     this.outputHelper.WriteLine("Received Packet");
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)
                         ))
                     {
                         continue;
@@ -180,10 +186,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var parameters = new List<string>() { "IncludeParameter" };
+
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         SynchroDataPacket synchroDataPacket = await this.createDataPacketHelper.CreateSynchroDataPacket(parameters);
 
         var content = synchroDataPacket.ToByteString();
@@ -221,11 +231,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 while (await this.receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup2Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup2Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -244,6 +253,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         //assert
         assertResult.Should().BeTrue();
     }
+
     [Fact]
     public async Task Publish_One_RowDataPacket_Using_AppGroup2Stream_And_SessionKey_To_AppStream2_Topic()
     {
@@ -252,10 +262,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var parameters = new List<string>() { "IncludeParameter" };
+
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         RowDataPacket rowDataPacket = await this.createDataPacketHelper.CreateRowDataPacket(parameters);
 
         var content = rowDataPacket.ToByteString();
@@ -293,11 +307,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 while (await this.receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup2Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)))
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup2Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)))
                     {
                         continue;
                     }
@@ -325,10 +338,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var parameters = new List<string>() { "IncludeParameter" };
+
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         var rowDataPacket1 = await this.createDataPacketHelper.CreateRowDataPacket(parameters, 1001);
         var rowDataPacket2 = await this.createDataPacketHelper.CreateRowDataPacket(parameters, 1002);
         var periodicDataPacket1 = await this.createDataPacketHelper.CreatePeriodicDataPacket(parameters, 1003);
@@ -465,10 +482,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var parameters = new List<string>() { "IncludeParameter" };
+
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         var periodicDataPacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(parameters, 4001);
 
         var content = periodicDataPacket.ToByteString();
@@ -547,15 +568,18 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
     {
         // Arrange
         if (packetWriter is null ||
-        this.createDataPacketHelper is null)
+            this.createDataPacketHelper is null)
         {
             throw new InvalidOperationException("test not initialised properly");
         }
 
-        var parameters = new List<string>() { "IncludeParameter" };
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         var writeStream = packetWriter.WriteDataPackets();
         var rnd = new Random();
         const int NumberOfMessages = 1000;
@@ -572,19 +596,19 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 {
                     Details =
                     {
-                    new DataPacketDetails
-                    {
-                        Stream = i % 3 == 0 ? "" : stream,
-                        DataSource = DataSource,
-                        Message = new Packet
+                        new DataPacketDetails
                         {
-                            Content = lstContents[i],
-                            IsEssential = false,
-                            SessionKey = runSessionId,
-                            Type = PeriodicDataType
-                        },
-                        SessionKey = runSessionId
-                    }
+                            Stream = i % 3 == 0 ? "" : stream,
+                            DataSource = DataSource,
+                            Message = new Packet
+                            {
+                                Content = lstContents[i],
+                                IsEssential = false,
+                                SessionKey = runSessionId,
+                                Type = PeriodicDataType
+                            },
+                            SessionKey = runSessionId
+                        }
                     }
                 });
         }
@@ -648,10 +672,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
+
         string eventName = "IncludeEvent";
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId);
+        this.ConfigureReceiveStream(runSessionId);
         EventPacket eventPacket = await this.createDataPacketHelper.CreateEventPacket(eventName);
 
         var packetType = EventType;
@@ -690,11 +715,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 {
                     this.outputHelper.WriteLine("Received Packet");
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)
                         ))
                     {
                         continue;
@@ -721,10 +745,12 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Arrange
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId, new DataPacketRequest
-        {
-            IncludeMarkers = true,
-        });
+        this.ConfigureReceiveStream(
+            runSessionId,
+            new DataPacketRequest
+            {
+                IncludeMarkers = true,
+            });
         MarkerPacket markerPacket = new MarkerPacket
         {
             Timestamp = 1732898780000123456,
@@ -769,11 +795,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 {
                     this.outputHelper.WriteLine("Received Packet");
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(content)
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(content)
                         ))
                     {
                         continue;
@@ -802,13 +827,19 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var parameters = new List<string>() { "IncludeParameter" };
+
+        var parameters = new List<string>()
+        {
+            "IncludeParameter"
+        };
         var runSessionId = Guid.NewGuid().ToString();
 
-        ConfigureReceiveStream(runSessionId, new DataPacketRequest
-        {
-            IncludeMarkers = false,
-        });
+        this.ConfigureReceiveStream(
+            runSessionId,
+            new DataPacketRequest
+            {
+                IncludeMarkers = false,
+            });
         MarkerPacket markerPacket = new MarkerPacket
         {
             Timestamp = 1732898780000123456,
@@ -898,13 +929,19 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.IncludeParameters.Add(includeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(excludeParameters, 4002);
 
@@ -989,13 +1026,20 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.IncludeParameters.Add(includeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateRowDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreateRowDataPacket(excludeParameters, 4002);
 
@@ -1081,13 +1125,20 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.IncludeParameters.Add(includeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateSynchroDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreateSynchroDataPacket(excludeParameters, 4002);
 
@@ -1173,13 +1224,20 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.ExcludeParameters.Add(excludeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(excludeParameters, 4002);
 
@@ -1265,13 +1323,20 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.ExcludeParameters.Add(excludeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateRowDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreateRowDataPacket(excludeParameters, 4002);
 
@@ -1357,13 +1422,20 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.ExcludeParameters.Add(excludeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateSynchroDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreateSynchroDataPacket(excludeParameters, 4002);
 
@@ -1449,13 +1521,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
+
         var includeEvents = "IncludeEvents321";
         var excludeEvents = "ExcludeEvents321";
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.IncludeEvents.Add(includeEvents);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateEventPacket(includeEvents);
         var excludePacket = await this.createDataPacketHelper.CreateEventPacket(excludeEvents);
 
@@ -1541,13 +1614,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         {
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
+
         var includeEvents = "IncludeEvents321";
         var excludeEvents = "ExcludeEvents321";
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.ExcludeEvents.Add(excludeEvents);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreateEventPacket(includeEvents);
         var excludePacket = await this.createDataPacketHelper.CreateEventPacket(excludeEvents);
 
@@ -1634,15 +1708,21 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string> { "IncludeParameter123" };
-        var excludeParameters = new List<string> { "ExcludeParameter123" };
+        var includeParameters = new List<string>
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>
+        {
+            "ExcludeParameter123"
+        };
         var runSessionId = Guid.NewGuid().ToString();
         var dataPacketRequest = new DataPacketRequest();
         dataPacketRequest.IncludeParameters.Add(includeParameters);
         dataPacketRequest.IncludeParameters.Add(excludeParameters);
         dataPacketRequest.ExcludeParameters.Add(excludeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(includeParameters, 4001);
         var excludePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(excludeParameters, 4002);
 
@@ -1728,8 +1808,14 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>() { "IncludeParameter123" };
-        var excludeParameters = new List<string>() { "ExcludeParameter123" };
+        var includeParameters = new List<string>()
+        {
+            "IncludeParameter123"
+        };
+        var excludeParameters = new List<string>()
+        {
+            "ExcludeParameter123"
+        };
         var packetParameters = new List<string>();
         packetParameters.AddRange(includeParameters);
         packetParameters.AddRange(excludeParameters);
@@ -1739,7 +1825,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         dataPacketRequest.IncludeParameters.Add(includeParameters);
         dataPacketRequest.ExcludeParameters.Add(excludeParameters);
 
-        ConfigureReceiveStream(runSessionId, dataPacketRequest);
+        this.ConfigureReceiveStream(runSessionId, dataPacketRequest);
         var includePacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(packetParameters, 4001);
 
         var packetType = PeriodicDataType;
@@ -1778,11 +1864,10 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 {
                     this.outputHelper.WriteLine("Received Packet");
                     var currentResponse = this.receiveStream.ResponseStream.Current.Response;
-                    if (!currentResponse.Any(
-                            packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                              packetResponse.Packet.SessionKey == runSessionId &&
-                                              packetResponse.Packet.Type == packetType &&
-                                              packetResponse.Packet.Content.SequenceEqual(includeContent)
+                    if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
+                                                               packetResponse.Packet.SessionKey == runSessionId &&
+                                                               packetResponse.Packet.Type == packetType &&
+                                                               packetResponse.Packet.Content.SequenceEqual(includeContent)
                         ))
                     {
                         continue;
@@ -1822,15 +1907,16 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
 
     private void ConfigureReceiveStream(string sessionKey, DataPacketRequest? request = null)
     {
-
         if (packetReader is null)
         {
             throw new InvalidOperationException("Packet reader is null which shouldn't be");
         }
+
         if (connectionManager is null)
         {
             throw new InvalidOperationException("Connection manager is null which shouldn't be");
         }
+
         if (request is null)
         {
             // If not specified, then allow everything. 
@@ -1838,6 +1924,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             {
             };
         }
+
         this.receiveConnection = connectionManager.NewConnection(
             new NewConnectionRequest
             {
@@ -1847,13 +1934,13 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                     SessionKey = sessionKey,
                     StreamOffsets =
                     {
-                                0,
-                                0
+                        0,
+                        0
                     },
                     Streams =
                     {
-                                AppGroup1Stream,
-                                AppGroup2Stream
+                        AppGroup1Stream,
+                        AppGroup2Stream
                     }
                 }
             });
@@ -1869,5 +1956,4 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             });
         this.outputHelper.WriteLine($"Connection ID: {this.receiveConnection.Connection.Id}");
     }
-
 }

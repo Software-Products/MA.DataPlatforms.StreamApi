@@ -1,6 +1,6 @@
-// <copyright file="TestClient.cs" company="McLaren Applied Ltd.">
+// <copyright file="TestClient.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,63 +15,75 @@
 // limitations under the License.
 // </copyright>
 
-using MA.Streaming.API;
-using MA.Streaming.Proto.Client.Remote;
+using System.ComponentModel;
+using System.Net;
+using System.Net.Sockets;
+
+using MA.Streaming.Abstraction;
+using MA.Streaming.Core.Configs;
 
 namespace MA.Streaming.TestClient;
 
 internal static class TestClient
 {
-    public static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
-        RemoteStreamingApiClient.Initialise("localhost:9092");
+        var port = IsPortAvailable(13579) ? 13579 : FindFreePortAfter(13579);
+        var configuration = new StreamingApiConfiguration(StreamCreationStrategy.TopicBased, "localhost:9094", [], port);
+        var cancellationTokenSource = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Dispose();
+        };
 
-        Console.WriteLine("Initialised StreamingApiClient");
+        var tasks = new List<Task>();
+        var producer = new TelemetryProducer(configuration, "vehicle-001");
 
-        TestConnection();
+        tasks.Add(producer.StartCollecting(cancellationTokenSource.Token));
 
-        RemoteStreamingApiClient.Shutdown();
+        var processor = new TelemetryProcessor(configuration, producer.DataSource, producer.SessionKey);
+        tasks.Add(processor.StartProcessing(cancellationTokenSource.Token));
 
-        Console.ReadLine();
+        Console.WriteLine("Telemetry application started. Press Ctrl+C to stop.");
 
-        Console.WriteLine("Shutdown StreamingApiClient");
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Application stopped.");
+        }
+        
     }
 
-    private static void TestConnection()
+    private static int FindFreePortAfter(int startPort, int maxPort = 65535)
     {
-        var cmc = RemoteStreamingApiClient.GetConnectionManagerClient();
-
-        var newRequest = new NewConnectionRequest
+        for (var port = startPort + 1; port <= maxPort; port++)
         {
-            Details = new ConnectionDetails
+            if (IsPortAvailable(port))
             {
-                DataSource = "TestDataSource"
+                return port;
             }
-        };
-        var connectionResponse = cmc.NewConnection(newRequest);
+        }
 
-        Console.WriteLine($"Connection established with Id {connectionResponse.Connection.Id}");
+        throw new InvalidOperationException("No free port found in the specified range.");
+    }
 
-        var getResponse = cmc.GetConnection(
-            new GetConnectionRequest
-            {
-                Connection = new Connection
-                {
-                    Id = connectionResponse.Connection.Id
-                }
-            });
-
-        Console.WriteLine(getResponse.Details != null ? "Connection verified" : "ERROR - connection not found");
-
-        var closeResponse = cmc.CloseConnection(
-            new CloseConnectionRequest
-            {
-                Connection = new Connection
-                {
-                    Id = connectionResponse.Connection.Id
-                }
-            });
-
-        Console.WriteLine(closeResponse.Success ? "Connection closed" : "ERROR - connection not closed");
+    private static bool IsPortAvailable(int port)
+    {
+        try
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+            listener.Stop();
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 }

@@ -1,6 +1,6 @@
-// <copyright file="ActiveConnectionManager.cs" company="McLaren Applied Ltd.">
+// <copyright file="ActiveConnectionManager.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,14 +58,6 @@ public class ActiveConnectionManager : IActiveConnectionManager
         return result;
     }
 
-    private void SetMetric()
-    {
-        foreach (var dataSourceConnection in this.dataSourceConnections)
-        {
-            MetricProviders.NumberOfConnections.WithLabels(dataSourceConnection.Key).Set(dataSourceConnection.Value.Count);
-        }
-    }
-
     public bool TryGetConnection(long id, out ConnectionDetails? details)
     {
         return this.connections.TryGetValue(id, out details);
@@ -88,5 +80,13 @@ public class ActiveConnectionManager : IActiveConnectionManager
         this.dataSourceConnections[removedItem.DataSource].RemoveAll(i => i == id);
         this.SetMetric();
         return tryRemoveConnection;
+    }
+
+    private void SetMetric()
+    {
+        foreach (var dataSourceConnection in this.dataSourceConnections)
+        {
+            MetricProviders.NumberOfConnections.WithLabels(dataSourceConnection.Key).Set(dataSourceConnection.Value.Count);
+        }
     }
 }

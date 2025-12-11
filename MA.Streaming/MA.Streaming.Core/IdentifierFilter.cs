@@ -1,6 +1,6 @@
-// <copyright file="IdentifierFileter.cs" company="McLaren Applied Ltd.">
+// <copyright file="IdentifierFilter.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,24 +35,18 @@ public class IdentifierFilter : IIdentifierFilter
         this.excludeList = this.defaultExludeList;
     }
 
-    public void SetIncludeList(IList<string> includeList)
+    public bool IdentifierInExcludeList(string identifier)
     {
-        if (!includeList.Any())
+        foreach (var excludePattern in this.excludeList)
         {
-            includeList = this.defaultIncludeList;
+            var r = new Regex(excludePattern, RegexOptions.None, TimeSpan.FromMilliseconds(1000));
+            if (r.Match(identifier).Success)
+            {
+                return true;
+            }
         }
 
-        this.includeList = includeList;
-    }
-
-    public void SetExcludeList(IList<string> excludeList)
-    {
-        if (!excludeList.Any())
-        {
-            excludeList = this.defaultExludeList;
-        }
-
-        this.excludeList = excludeList;
+        return false;
     }
 
     public bool IdentifierInIncludeList(string identifier)
@@ -69,18 +63,24 @@ public class IdentifierFilter : IIdentifierFilter
         return false;
     }
 
-    public bool IdentifierInExcludeList(string identifier)
+    public void SetExcludeList(IList<string> excludeList)
     {
-        foreach (var excludePattern in this.excludeList)
+        if (!excludeList.Any())
         {
-            var r = new Regex(excludePattern, RegexOptions.None, TimeSpan.FromMilliseconds(1000));
-            if (r.Match(identifier).Success)
-            {
-                return true;
-            }
+            excludeList = this.defaultExludeList;
         }
 
-        return false;
+        this.excludeList = excludeList;
+    }
+
+    public void SetIncludeList(IList<string> includeList)
+    {
+        if (!includeList.Any())
+        {
+            includeList = this.defaultIncludeList;
+        }
+
+        this.includeList = includeList;
     }
 
     public bool ShouldIncludeIdentifier(string identifier)

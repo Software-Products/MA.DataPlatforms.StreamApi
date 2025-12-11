@@ -1,6 +1,6 @@
-// <copyright file="ReadDataPacketResponseStreamWriterHandler.cs" company="McLaren Applied Ltd.">
+// <copyright file="ReadDataPacketResponseStreamWriterHandler.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,26 +15,28 @@
 // limitations under the License.
 // </copyright>
 
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
+
 using Google.Protobuf.WellKnownTypes;
+
 using Grpc.Core;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
-using MA.Streaming.Core.DataFormatManagement;
 using MA.Streaming.OpenData;
 using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
-using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
 
 namespace MA.Streaming.Proto.Core.Handlers;
 
 public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStreamWriterHandlerBase<ReadDataPacketsResponse>, IReadDataPacketResponseStreamWriterHandler
 {
     private readonly IServerStreamWriter<ReadDataPacketsResponse> responseStream;
-    private readonly IInMemoryRepository<(string dataSource, ulong dataFormatIdentifier, DataFormatTypeDto dataFormatType), DataFormatRecord> dataFormatByUlongIdentifierRepository;
+    private readonly IInMemoryRepository<(string dataSource, ulong dataFormatIdentifier, DataFormatTypeDto dataFormatType), DataFormatRecord>
+        dataFormatByUlongIdentifierRepository;
     private readonly IIdentifierFilter parameterIdentifierFilter;
     private readonly IIdentifierFilter eventIdentifierFilter;
     private readonly bool includeMarkers;
@@ -82,16 +84,14 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         try
         {
             // Filter packets 
-            var packetResponses = receivedItems.Where(
-                i => this.IncludePacket(
-                    Packet.Parser.ParseFrom(i.MessageBytes))
-            ).Select(
-                i => new PacketResponse
-                {
-                    Packet = Packet.Parser.ParseFrom(i.MessageBytes),
-                    Stream = i.Stream,
-                    SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
-                }).ToList();
+            var packetResponses = receivedItems.Where(i => this.IncludePacket(
+                Packet.Parser.ParseFrom(i.MessageBytes))
+            ).Select(i => new PacketResponse
+            {
+                Packet = Packet.Parser.ParseFrom(i.MessageBytes),
+                Stream = i.Stream,
+                SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
+            }).ToList();
 
             if (packetResponses.Any())
             {
@@ -100,7 +100,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
                     {
                         Response =
                         {
-                                packetResponses
+                            packetResponses
                         }
                     });
                 var streamItems = receivedItems.GroupBy(i => i.Stream);
@@ -192,7 +192,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
                 }
                 default:
                 {
-                        this.Logger.Trace($"Read data packet ignoring packet type{packet.Type}.");
+                    this.Logger.Trace($"Read data packet ignoring packet type{packet.Type}.");
                     break;
                 }
             }
@@ -211,7 +211,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         {
             return filter;
         }
-        
+
         var dataFormatIdentifier = dataFormat.DataFormatIdentifier;
         IReadOnlyList<string> parameterIdentifiers;
 
@@ -254,6 +254,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         {
             return filter;
         }
+
         var dataFormatIdentifier = dataFormat.DataFormatIdentifier;
         string eventIdentifier;
 
@@ -273,6 +274,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
 
             eventIdentifier = dataFormatRecord.StringIdentifiers[0];
         }
+
         try
         {
             if (this.eventIdentifierFilter.ShouldIncludeIdentifier(eventIdentifier))
@@ -286,6 +288,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         {
             this.Logger.Warning($"Timeout trying to match the event filter {e.Pattern}");
         }
+
         filter = false;
         this.eventDfFilterCache.TryAdd(dataFormat, filter);
         return filter;

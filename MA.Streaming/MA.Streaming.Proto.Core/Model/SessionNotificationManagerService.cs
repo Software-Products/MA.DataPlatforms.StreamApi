@@ -1,6 +1,6 @@
-// <copyright file="SessionNotificationManagerService.cs" company="McLaren Applied Ltd.">
+// <copyright file="SessionNotificationManagerService.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,8 +29,6 @@ public class SessionNotificationManagerService : ISessionNotificationManagerServ
     private readonly INotificationStreamWriterService<GetSessionStartNotificationResponse> startNotificationStreamWriterService;
     private readonly INotificationStreamWriterService<GetSessionStopNotificationResponse> stopNotificationStreamWriterService;
 
-    public bool Started { get; private set; }
-
     public SessionNotificationManagerService(
         ISessionInfoService sessionInfoService,
         INotificationStreamWriterService<GetSessionStartNotificationResponse> startNotificationStreamWriterService,
@@ -39,6 +37,18 @@ public class SessionNotificationManagerService : ISessionNotificationManagerServ
         this.sessionInfoService = sessionInfoService;
         this.startNotificationStreamWriterService = startNotificationStreamWriterService;
         this.stopNotificationStreamWriterService = stopNotificationStreamWriterService;
+    }
+
+    public bool Started { get; private set; }
+
+    public async Task AddStartNotificationStream(string dataSource, IServerStreamWriter<GetSessionStartNotificationResponse> notificationStreamWriter)
+    {
+        await this.startNotificationStreamWriterService.AddAndHoldStreamWriter(dataSource, notificationStreamWriter);
+    }
+
+    public async Task AddStopNotificationStream(string dataSource, IServerStreamWriter<GetSessionStopNotificationResponse> notificationStreamWriter)
+    {
+        await this.stopNotificationStreamWriterService.AddAndHoldStreamWriter(dataSource, notificationStreamWriter);
     }
 
     public void Start()
@@ -51,16 +61,6 @@ public class SessionNotificationManagerService : ISessionNotificationManagerServ
         this.sessionInfoService.SessionStarted += this.SessionInfoService_SessionStarted;
         this.sessionInfoService.SessionStopped += this.SessionInfoService_SessionStopped;
         this.Started = true;
-    }
-
-    public async Task AddStartNotificationStream(string dataSource, IServerStreamWriter<GetSessionStartNotificationResponse> notificationStreamWriter)
-    {
-        await this.startNotificationStreamWriterService.AddAndHoldStreamWriter(dataSource, notificationStreamWriter);
-    }
-
-    public async Task AddStopNotificationStream(string dataSource, IServerStreamWriter<GetSessionStopNotificationResponse> notificationStreamWriter)
-    {
-        await this.stopNotificationStreamWriterService.AddAndHoldStreamWriter(dataSource, notificationStreamWriter);
     }
 
     private void SessionInfoService_SessionStarted(object? sender, SessionsInfoChangeEventArg e)

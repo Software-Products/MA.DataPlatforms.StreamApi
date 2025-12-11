@@ -1,6 +1,6 @@
-// <copyright file="DataStreamWriterHandlerFactory.cs" company="McLaren Applied Ltd.">
+// <copyright file="DataStreamWriterHandlerFactory.cs" company="Motion Applied Ltd.">
 //
-// Copyright 2024 McLaren Applied Ltd
+// Copyright 2025 Motion Applied Ltd
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.DataFormatManagement;
 using MA.Streaming.Core.Routing;
 using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.Core.Handlers;
@@ -39,6 +38,7 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
     private readonly IStreamingApiConfiguration config;
+
     public DataStreamWriterHandlerFactory(
         IInMemoryRepository<long, IReadDataPacketResponseStreamWriterHandler> handlerRepository,
         IRouteSubscriberFactory routeSubscriberFactory,
@@ -46,7 +46,7 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
         IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper,
         ILogger logger,
         IStreamingApiConfigurationProvider apiConfigurationProvider
-        )
+    )
     {
         this.handlerRepository = handlerRepository;
         this.routeSubscriberFactory = routeSubscriberFactory;
@@ -57,11 +57,11 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
     }
 
     public async Task<IReadDataPacketResponseStreamWriterHandler?> Create(
-        DataPacketRequest dataPacketRequest, 
-        IServerStreamWriter<ReadDataPacketsResponse> serverStreamWriter, 
+        DataPacketRequest dataPacketRequest,
+        IServerStreamWriter<ReadDataPacketsResponse> serverStreamWriter,
         ServerCallContext context,
         IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository
-        )
+    )
     {
         try
         {
