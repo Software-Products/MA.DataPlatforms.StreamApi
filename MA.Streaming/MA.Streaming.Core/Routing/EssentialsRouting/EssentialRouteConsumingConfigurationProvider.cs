@@ -51,7 +51,7 @@ public class EssentialRouteConsumingConfigurationProvider : IConsumingConfigurat
                     this.streamApiConfig.BrokerUrl,
                     Guid.NewGuid().ToString(),
                     AutoOffsetResetMode.FromOffset,
-                    this.connectionDetailsDto.MainOffset),
+                    this.connectionDetailsDto.EssentialsOffset),
                 essentialRoute,
                 new KafkaTopicMetaData(essentialRoute.Topic, 1))
         };
