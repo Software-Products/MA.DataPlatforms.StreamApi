@@ -15,11 +15,15 @@
 // limitations under the License.
 // </copyright>
 
-using System.Text.Json;
-
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
+
+using Microsoft.Extensions.Configuration;
+
+using Serilog;
+
+using ILogger = MA.Common.Abstractions.ILogger;
 
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
@@ -27,6 +31,7 @@ internal static class ServerStarter
 {
     private static bool started;
     private static readonly object HandleRequestLock = new();
+    private static ILogger? logger;
 
     public static void Start()
     {
@@ -38,9 +43,26 @@ internal static class ServerStarter
                 {
                     return;
                 }
+                
+                var configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile(AppDefinition.StreamApiConfigFilePath, optional: false, reloadOnChange: true)
+                    .AddEnvironmentVariables()
+                    .Build();
 
-                var hostConfig = JsonSerializer.Deserialize<HostStreamApiConfiguration>(
-                    File.ReadAllText(Environment.CurrentDirectory + AppDefinition.StreamApiConfigFilePath));
+                var serilogLogger = new LoggerConfiguration()
+                    .ReadFrom.Configuration(configuration)
+                    .Enrich.FromLogContext()
+                    .Enrich.WithProperty("Application", "StreamAPI")
+                    .CreateLogger();
+
+                Log.Logger = serilogLogger;
+
+                logger = new SerilogLoggerAdapter(serilogLogger);
+
+                logger.Info("Starting Stream API Server...");
+                var streamApiSection = configuration.GetSection("StreamApiConfig");
+                var hostConfig = streamApiSection.Get<HostStreamApiConfiguration>();
 
                 if (hostConfig == null)
                 {
@@ -58,9 +80,15 @@ internal static class ServerStarter
                     hostConfig.UseRemoteKeyGenerator,
                     hostConfig.RemoteKeyGeneratorServiceAddress,
                     hostConfig.BatchingResponses,
-                    hostConfig.InitialisationTimeoutSeconds);
+                    hostConfig.InitialisationTimeoutSeconds,
+                    hostConfig.TerminationTimeoutSeconds);
 
-                var server = new Server(streamApiConfig, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+                var server = new Server(
+                    streamApiConfig,
+                    new CancellationTokenSourceProvider(),
+                    new KafkaBrokerAvailabilityChecker(),
+                    new LoggingDirectoryProvider(""),
+                    logger: logger);
                 _ = Task.Run(async () =>
                 {
                     try

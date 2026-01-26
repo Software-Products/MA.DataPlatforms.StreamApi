@@ -22,6 +22,7 @@ using Google.Protobuf;
 using MA.Common;
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
@@ -29,7 +30,6 @@ using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.DataFormatManagement;
 using MA.Streaming.Core.Routing;
-using MA.Streaming.Core.Routing.EssentialsRouting;
 using MA.Streaming.IntegrationTests.Base;
 using MA.Streaming.IntegrationTests.Helper;
 using MA.Streaming.OpenData;
@@ -44,40 +44,50 @@ using Xunit.Abstractions;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class DataFormatInfoServiceShould
 {
-    private const string BrokerUrl = "localhost:9097";
-    private const string DataSource = "Data_Format_Info_Test_Datasource";
+    private const string BrokerUrl = "localhost:9098";
+    private const string DataSourcePrefix = "DFISSDatasource";
+    private const string DomainPrefix = "DFISSDomain";
     private readonly ITestOutputHelper outputHelper;
-
+    private readonly string dataSource;
     private readonly ThreadSafeInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord> stringToDataRecordRepository;
     private readonly ThreadSafeInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> ulongToDataRecordRepository;
     private readonly DataFormatInfoService dataFormatInfoService;
     private readonly DataSourcesRepository dataSourceRepository;
     private readonly KeyGeneratorService keyGenerator;
-    private readonly EssentialTopicNameCreator essentialTopicNameCreator;
     private readonly TypeNameProvider typeNameProvider = new();
+    private readonly string essentialTopicName;
 
-    public DataFormatInfoServiceShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
+    public DataFormatInfoServiceShould(ITestOutputHelper outputHelper)
     {
+        this.dataSource = DataSourceCreator.Create(DataSourcePrefix);
+        var domain1 = DomainCreator.Create(DomainPrefix);
         this.outputHelper = outputHelper;
         var streamingApiConfiguration = new StreamingApiConfiguration(
             StreamCreationStrategy.PartitionBased,
             BrokerUrl,
             [],
             integrateDataFormatManagement: true,
-            integrateSessionManagement: false);
+            integrateSessionManagement: false,
+            domain: domain1);
         var logger = Substitute.For<ILogger>();
-        var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
+        var repository = new RouteReadingWritingComponentRepository<KafkaRouteSubscriber>(logger);
         var streamingApiConfigurationProvider =
             new StreamingApiConfigurationProvider(streamingApiConfiguration);
-        var dataFormatRoutesFactory = new DataFormatRoutesFactory(new EssentialTopicNameCreator());
-        this.dataSourceRepository = new DataSourcesRepository(new KafkaTopicHelper(), streamingApiConfigurationProvider);
+        var routingMappingInfoRepository = new RoutingMappingInfoRepository();
+        var domainNameProvider = new DomainNameProvider(domain1);
+        var domainKafkaRouteMappingInfoCreator = new DomainKafkaRouteMappingInfoCreator(domainNameProvider, streamingApiConfigurationProvider);
+        var kafkaRouteInfoCreator = new KafkaRouteInfoCreator(domainKafkaRouteMappingInfoCreator, streamingApiConfigurationProvider, routingMappingInfoRepository);
+        var dataFormatRoutesFactory = new DataFormatRoutesFactory(kafkaRouteInfoCreator);
+        var kafkaTopicHelper = new KafkaTopicHelper();
+        this.dataSourceRepository = new DataSourcesRepository(kafkaTopicHelper, streamingApiConfigurationProvider, domainKafkaRouteMappingInfoCreator);
         var dataFormatRouteSubscriberFactory = new DataFormatRouteSubscriberFactory(
             streamingApiConfigurationProvider,
-            cancellationTokenSourceProvider,
             logger,
-            new KafkaRouteManager(logger));
+            new KafkaRouteManager(logger),
+            repository,
+            domainNameProvider);
         this.stringToDataRecordRepository = new ThreadSafeInMemoryRepository<(string, string, DataFormatTypeDto), DataFormatRecord>();
         this.ulongToDataRecordRepository = new ThreadSafeInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord>();
         var datasourceDataFormatsRepository = new ThreadSafeInMemoryRepository<string, List<DataFormatRecord>>();
@@ -97,10 +107,10 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
             dataFormatDefinitionPacketDtoFromByteFactory,
             this.typeNameProvider,
             parameterListKeyIdentifierCreator,
+            routingMappingInfoRepository,
             logger);
-        new KafkaClearHelper(BrokerUrl).Clear().Wait();
         this.keyGenerator = new KeyGeneratorService(new LoggingDirectoryProvider(""));
-        this.essentialTopicNameCreator = new EssentialTopicNameCreator();
+        this.essentialTopicName = kafkaRouteInfoCreator.CreateEssentialRouteInfo(this.dataSource).KafkaRouteTopicInfo.Topic;
     }
 
     [Fact]
@@ -129,12 +139,12 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
     {
         //arrange
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //act
 
         this.dataFormatInfoService.Start();
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //assert
         beforeStartTopicInfos.Count.Should().Be(0);
@@ -147,14 +157,13 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
     {
         //arrange
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //act
 
         this.dataFormatInfoService.Start();
-        new AutoResetEvent(false).WaitOne(1000);
-        this.dataSourceRepository.Add(DataSource);
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        this.dataSourceRepository.Add(this.dataSource);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //assert
         beforeStartTopicInfos.Count.Should().Be(0);
@@ -167,14 +176,14 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
     {
         //arrange
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
-        this.dataSourceRepository.Add(DataSource);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
+        this.dataSourceRepository.Add(this.dataSource);
 
         //act
 
         this.dataFormatInfoService.Start();
         new AutoResetEvent(false).WaitOne(1000);
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //assert
         beforeStartTopicInfos.Count.Should().Be(0);
@@ -188,8 +197,7 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         //arrange
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var essentialTopic = this.essentialTopicNameCreator.Create(DataSource);
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
         var paramUlongIdentifier = this.keyGenerator.GenerateUlongKey();
         var parameterIdentifiersList = new List<string>
         {
@@ -220,20 +228,19 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         };
 
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, parameterDataFormatDefinitionPacket.ToByteString()));
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, eventDataFormatDefinitionPacket.ToByteString()));
         new AutoResetEvent(false).WaitOne(2000);
         //act
         this.dataFormatInfoService.Start();
-        new AutoResetEvent(false).WaitOne(5000);
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //assert
-        beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
-        afterStartTopicInfos.Any(i => i.TopicName == essentialTopic).Should().BeTrue();
+        beforeStartTopicInfos.Any(i => i.TopicName == this.essentialTopicName).Should().BeFalse();
+        afterStartTopicInfos.Any(i => i.TopicName == this.essentialTopicName).Should().BeTrue();
         var allDataFormatsRecords = this.stringToDataRecordRepository.GetAll();
         allDataFormatsRecords.Count.Should().Be(2);
         allDataFormatsRecords.Count(i => i.DataFormatTypeDto == DataFormatTypeDto.Parameter).Should().Be(1);
@@ -253,14 +260,14 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         eventRecord.StringIdentifierKey.Should().Be(EventIdentifier);
         eventRecord.Identifiers.Should().BeEquivalentTo([eventUlongIdentifier]);
 
-        var foundDataFormatRecord = this.stringToDataRecordRepository.Get((DataSource, ExpectedParameterIdentifiersKey, DataFormatTypeDto.Parameter));
+        var foundDataFormatRecord = this.stringToDataRecordRepository.Get((this.dataSource, ExpectedParameterIdentifiersKey, DataFormatTypeDto.Parameter));
         foundDataFormatRecord.Should().NotBeNull();
-        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, paramUlongIdentifier, DataFormatTypeDto.Parameter));
+        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, paramUlongIdentifier, DataFormatTypeDto.Parameter));
         foundDataFormatRecord.Should().NotBeNull();
 
-        var foundEventDataFormatRecord = this.stringToDataRecordRepository.Get((DataSource, EventIdentifier, DataFormatTypeDto.Event));
+        var foundEventDataFormatRecord = this.stringToDataRecordRepository.Get((this.dataSource, EventIdentifier, DataFormatTypeDto.Event));
         foundEventDataFormatRecord.Should().NotBeNull();
-        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, eventUlongIdentifier, DataFormatTypeDto.Event));
+        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, eventUlongIdentifier, DataFormatTypeDto.Event));
         foundEventDataFormatRecord.Should().NotBeNull();
     }
 
@@ -270,8 +277,7 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         //arrange
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var essentialTopic = this.essentialTopicNameCreator.Create(DataSource);
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
         var paramUlongIdentifier1 = this.keyGenerator.GenerateUlongKey();
         var paramUlongIdentifier2 = this.keyGenerator.GenerateUlongKey();
         var parameterIdentifiersList = new List<string>
@@ -323,26 +329,25 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         };
 
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, parameterDataFormatDefinitionPacket1.ToByteString()));
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, eventDataFormatDefinitionPacket1.ToByteString()));
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, parameterDataFormatDefinitionPacket2.ToByteString()));
         kafkaPublishHelper.PublishData(
-            essentialTopic,
+            this.essentialTopicName,
             GetPacketBytes(this.typeNameProvider.DataFormatDefinitionPacketTypeName, eventDataFormatDefinitionPacket2.ToByteString()));
         new AutoResetEvent(false).WaitOne(2000);
         //act
         this.dataFormatInfoService.Start();
-        new AutoResetEvent(false).WaitOne(2000);
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicSuffix(BrokerUrl, Constants.EssentialTopicNameSuffix);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicPrefix(BrokerUrl, this.essentialTopicName);
 
         //assert
-        beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
-        afterStartTopicInfos.Any(i => i.TopicName == essentialTopic).Should().BeTrue();
+        beforeStartTopicInfos.Any(i => i.TopicName == this.essentialTopicName).Should().BeFalse();
+        afterStartTopicInfos.Any(i => i.TopicName == this.essentialTopicName).Should().BeTrue();
         var allDataFormatsRecords = this.stringToDataRecordRepository.GetAll();
         allDataFormatsRecords.Count.Should().Be(2);
         allDataFormatsRecords.Count(i => i.DataFormatTypeDto == DataFormatTypeDto.Parameter).Should().Be(1);
@@ -358,18 +363,18 @@ public class DataFormatInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixtur
         eventRecord.StringIdentifierKey.Should().Be(eventIdentifier);
         eventRecord.Identifiers.Should().BeEquivalentTo([eventUlongIdentifier1, eventUlongIdentifier2]);
 
-        var foundDataFormatRecord = this.stringToDataRecordRepository.Get((DataSource, ExpectedParameterIdentifiersKey, DataFormatTypeDto.Parameter));
+        var foundDataFormatRecord = this.stringToDataRecordRepository.Get((this.dataSource, ExpectedParameterIdentifiersKey, DataFormatTypeDto.Parameter));
         foundDataFormatRecord.Should().NotBeNull();
-        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, paramUlongIdentifier1, DataFormatTypeDto.Parameter));
+        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, paramUlongIdentifier1, DataFormatTypeDto.Parameter));
         foundDataFormatRecord.Should().NotBeNull();
-        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, paramUlongIdentifier2, DataFormatTypeDto.Parameter));
+        foundDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, paramUlongIdentifier2, DataFormatTypeDto.Parameter));
         foundDataFormatRecord.Should().NotBeNull();
 
-        var foundEventDataFormatRecord = this.stringToDataRecordRepository.Get((DataSource, eventIdentifier, DataFormatTypeDto.Event));
+        var foundEventDataFormatRecord = this.stringToDataRecordRepository.Get((this.dataSource, eventIdentifier, DataFormatTypeDto.Event));
         foundEventDataFormatRecord.Should().NotBeNull();
-        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, eventUlongIdentifier1, DataFormatTypeDto.Event));
+        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, eventUlongIdentifier1, DataFormatTypeDto.Event));
         foundEventDataFormatRecord.Should().NotBeNull();
-        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((DataSource, eventUlongIdentifier2, DataFormatTypeDto.Event));
+        foundEventDataFormatRecord = this.ulongToDataRecordRepository.Get((this.dataSource, eventUlongIdentifier2, DataFormatTypeDto.Event));
         foundEventDataFormatRecord.Should().NotBeNull();
     }
 

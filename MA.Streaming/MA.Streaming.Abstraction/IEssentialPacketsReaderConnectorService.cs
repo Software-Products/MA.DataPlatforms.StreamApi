@@ -23,7 +23,6 @@ public interface IEssentialPacketsReaderConnectorService
 {
     public event EventHandler<PacketReceivedInfoEventArgs> PacketReceived;
 
-    public event EventHandler<EssentialReadingCompletedEventArgs> ReadingCompleted;
-
     public void Start(ConnectionDetailsDto connectionDetailsDto);
+    public void Stop();
 }

@@ -33,7 +33,7 @@ public interface ISessionInfoService
 
     (bool Success, string Message) UpdateSessionInfo(string sessionKey, SessionInfoPacketDto sessionInfo);
 
-    (bool Success, string Message) EndSession(string sessionKey, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto);
+    (bool Success, string Message) EndSession(string sessionKey, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto, DateTime sessionTerminationTime);
 
     (bool Success, string Message) AddNewSession(string sessionKey, NewSessionPacketDto newSessionPacket);
 

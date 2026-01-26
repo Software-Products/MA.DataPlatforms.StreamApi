@@ -17,10 +17,13 @@
 
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core;
+using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Core.Abstractions;
@@ -32,20 +35,29 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository;
     private readonly IPacketWriterHelper packetWriterHelper;
     private readonly ISessionInfoService sessionInfoService;
-    private readonly IRouteInfoProvider routeInfoProvider;
+    private readonly IKafkaBrokerRoutesOffsetExtractor kafkaBrokerRoutesOffsetExtractor;
     private readonly ITypeNameProvider typeNameProvider;
+    private readonly ISessionPacketWritingLogProvider sessionPacketLogProvider;
+    private readonly IStreamStoppedPacketRequestFactory streamStoppedPacketRequestFactory;
+    private readonly IStreamManager streamManager;
 
     public SessionEndingRequestHandler(
-        IRouteInfoProvider routeInfoProvider,
+        IKafkaBrokerRoutesOffsetExtractor kafkaBrokerRoutesOffsetExtractor,
         ITypeNameProvider typeNameProvider,
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
         IPacketWriterHelper packetWriterHelper,
-        ISessionInfoService sessionInfoService)
+        ISessionInfoService sessionInfoService,
+        ISessionPacketWritingLogProvider sessionPacketLogProvider,
+        IStreamStoppedPacketRequestFactory streamStoppedPacketRequestFactory,
+        IStreamManager streamManager)
     {
         this.sessionInfoRepository = sessionInfoRepository;
         this.packetWriterHelper = packetWriterHelper;
         this.sessionInfoService = sessionInfoService;
-        this.routeInfoProvider = routeInfoProvider;
+        this.kafkaBrokerRoutesOffsetExtractor = kafkaBrokerRoutesOffsetExtractor;
+        this.sessionPacketLogProvider = sessionPacketLogProvider;
+        this.streamStoppedPacketRequestFactory = streamStoppedPacketRequestFactory;
+        this.streamManager = streamManager;
         this.typeNameProvider = typeNameProvider;
     }
 
@@ -57,11 +69,11 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
             return CreateUnsuccessfulResponse();
         }
 
-        var partitionOffsetsInfo = this.GetTopicPartitionOffsets(sessionDetailRecord.DataSource);
+        var partitionOffsetsInfos = this.kafkaBrokerRoutesOffsetExtractor.Extract(sessionDetailRecord.DataSource);
 
-        var endOfSession = CreateEndOfSessionPacket(sessionDetailRecord, partitionOffsetsInfo.mapfields);
+        var endOfSession = CreateEndOfSessionPacket(sessionDetailRecord, partitionOffsetsInfos, request.TerminationTime);
 
-        var res = this.sessionInfoService.EndSession(request.SessionKey, partitionOffsetsInfo.topicPartitionOffsetDtos);
+        var res = this.sessionInfoService.EndSession(request.SessionKey, partitionOffsetsInfos, endOfSession.TerminationTime.ToDateTime());
         if (!res.Success)
         {
             return CreateUnsuccessfulResponse();
@@ -74,6 +86,8 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
 
     private void WritePacket(EndSessionRequest request, EndOfSessionPacket endOfSession, SessionDetailRecord sessionDetailRecord)
     {
+        this.EndAllActiveStreams(request);
+
         this.packetWriterHelper.WriteInfoPacket(
             request.SessionKey,
             this.typeNameProvider.EndOfSessionPacketTypeName,
@@ -100,31 +114,54 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
         return endSessionResponse;
     }
 
-    private static EndOfSessionPacket CreateEndOfSessionPacket(SessionDetailRecord sessionDetailRecord, MapField<string, long> topicPartitionOffsets)
+    private static EndOfSessionPacket CreateEndOfSessionPacket(
+        SessionDetailRecord sessionDetailRecord,
+        IEnumerable<TopicPartitionOffsetDto> topicPartitionOffsets,
+        Timestamp? sessionTerminationTime)
     {
+        var protoTopicOffsets = new MapField<string, long>();
+        foreach (var topicPartitionOffset in topicPartitionOffsets)
+        {
+            protoTopicOffsets.Add(topicPartitionOffset.Title, topicPartitionOffset.Offset);
+        }
+
         var endOfSession = new EndOfSessionPacket
         {
             DataSource = sessionDetailRecord.DataSource,
             TopicPartitionOffsets =
             {
-                topicPartitionOffsets
-            }
+                protoTopicOffsets
+            },
+            TerminationTime = sessionTerminationTime ?? Timestamp.FromDateTime(DateTime.UtcNow)
         };
         return endOfSession;
     }
 
-    private (IReadOnlyList<TopicPartitionOffsetDto> topicPartitionOffsetDtos, MapField<string, long> mapfields) GetTopicPartitionOffsets(string dataSource)
+    private void EndAllActiveStreams(EndSessionRequest request)
     {
-        var result = new MapField<string, long>();
-        var topicPartitionOffsets = new List<TopicPartitionOffsetDto>();
+        var sessionWritingLog = this.sessionPacketLogProvider.Provide(request.DataSource, request.SessionKey);
+        var streamsToEnd = sessionWritingLog.GetActiveStreams();
 
-        var routeInfos = this.routeInfoProvider.GetRouteInfo(dataSource).Cast<KafkaRouteInfo>().ToList();
-        foreach (var routeInfo in routeInfos)
+        foreach (var stream in streamsToEnd.Where(i => i != ConstantSystemKeyStreamNames.EssentialStreamName)
+                     .Where(stream => this.streamManager.CheckIfStreamIsEnded(request.DataSource, request.SessionKey, stream)))
         {
-            result.Add($"{routeInfo.Topic}:{routeInfo.Partition}", routeInfo.Offset);
-            topicPartitionOffsets.Add(new TopicPartitionOffsetDto(routeInfo.Topic, routeInfo.Partition, routeInfo.Offset));
+            this.packetWriterHelper.WriteDataPacket(
+                this.streamStoppedPacketRequestFactory.CreateStreamStoppedPacketWritingRequest(
+                    request.DataSource,
+                    request.SessionKey,
+                    stream,
+                    false));
         }
 
-        return (topicPartitionOffsets, result);
+        WaitForTheWritingToFinish(sessionWritingLog);
+    }
+
+    private static void WaitForTheWritingToFinish(ISessionPacketWritingLog sessionWritingLog)
+    {
+        Task.Delay(1000).Wait();
+        while (DateTime.Now - sessionWritingLog.GetWhenLastUpdated() < TimeSpan.FromSeconds(1))
+        {
+            Task.Delay(1000).Wait();
+        }
     }
 }

@@ -49,18 +49,14 @@ public class EssentialRouteConsumingConfigurationProviderTests
         var streamingApiConfigProvider = Substitute.For<IStreamingApiConfigurationProvider>();
         streamingApiConfigProvider.Provide().Returns(streamingApiConfig);
 
-        var routeBindingInfoRepository = Substitute.For<IRouteBindingInfoRepository>();
-        routeBindingInfoRepository.GetOrAdd("ds1", Arg.Any<string>(), true)
-            .Returns(new RouteBindingInfo("route1", "ds1", "essential", true));
-
-        var essentialTopicNameCreator = Substitute.For<IEssentialTopicNameCreator>();
-        essentialTopicNameCreator.Create("ds1").Returns("topic1");
+        var kafkaRouteInfoCreator = Substitute.For<IKafkaRouteInfoCreator>();
+        kafkaRouteInfoCreator.CreateEssentialRouteInfo("ds1").Returns(
+            new KafkaRouteInfo(new RouteNameInfo("domain1", "ds1", "essential", RouteType.Essential), new KafkaRouteTopicInfo("topic1", 0)));
 
         var provider = new EssentialRouteConsumingConfigurationProvider(
             connectionDetailsDto,
             streamingApiConfigProvider,
-            routeBindingInfoRepository,
-            essentialTopicNameCreator);
+            kafkaRouteInfoCreator);
 
         // Act
         var config = provider.Provide();

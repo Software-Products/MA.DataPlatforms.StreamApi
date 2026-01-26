@@ -40,6 +40,7 @@ public class DataFormatInfoService : IDataFormatInfoService
     private readonly IDtoFromByteFactory<PacketDto> packetDtoFromByteFactory;
     private readonly IDtoFromByteFactory<DataFormatDefinitionPacketDto> dataFormatDefinitionPacketFromByteFactory;
     private readonly IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator;
+    private readonly IRoutingMappingInfoRepository routingMappingInfoRepository;
     private readonly ILogger logger;
 
     private readonly object startingLock = new();
@@ -63,6 +64,7 @@ public class DataFormatInfoService : IDataFormatInfoService
         IDtoFromByteFactory<DataFormatDefinitionPacketDto> dataFormatDefinitionPacketFromByteFactory,
         ITypeNameProvider typeNameProvider,
         IParameterListKeyIdentifierCreator parameterListKeyIdentifierCreator,
+        IRoutingMappingInfoRepository routingMappingInfoRepository,
         ILogger logger)
     {
         this.dataFormatRoutesFactory = dataFormatRoutesFactory;
@@ -73,6 +75,7 @@ public class DataFormatInfoService : IDataFormatInfoService
         this.packetDtoFromByteFactory = packetDtoFromByteFactory;
         this.dataFormatDefinitionPacketFromByteFactory = dataFormatDefinitionPacketFromByteFactory;
         this.parameterListKeyIdentifierCreator = parameterListKeyIdentifierCreator;
+        this.routingMappingInfoRepository = routingMappingInfoRepository;
         this.logger = logger;
         this.dataSourceDataFormatsRepository = dataSourceDataFormatsRepository;
         this.dataFormatDefinitionPacketTypeName = typeNameProvider.DataFormatDefinitionPacketTypeName;
@@ -230,8 +233,15 @@ public class DataFormatInfoService : IDataFormatInfoService
         return packet;
     }
 
-    private void HandleDataFormatDefinitionPacketReceived(PacketDto packet, string dataSource)
+    private void HandleDataFormatDefinitionPacketReceived(PacketDto packet, string topic)
     {
+        var dataSourceRoutingMappingInfo = this.routingMappingInfoRepository.GetRouteInfo(topic);
+        if (dataSourceRoutingMappingInfo is null)
+        {
+            this.logger.Error($"No routing mapping info found for topic: {topic} in data format service");
+            return;
+        }
+
         var dataFormatDefinitionPacketDto = this.dataFormatDefinitionPacketFromByteFactory.ToDto(packet.Content);
         if (dataFormatDefinitionPacketDto is null)
         {
@@ -243,9 +253,10 @@ public class DataFormatInfoService : IDataFormatInfoService
         var stringIdentifiers = dataFormatDefinitionPacketDto.ContentIdentifiers;
         var dataFormatTypeDto = dataFormatDefinitionPacketDto.DataFormatTypeDto;
 
-        this.AddDataFormatRecordToRepositories(dataSource, stringIdentifierKey, stringIdentifiers, dataFormatId, dataFormatTypeDto);
+        this.AddDataFormatRecordToRepositories(dataSourceRoutingMappingInfo.RouteNameInfo.DataSource, stringIdentifierKey, stringIdentifiers, dataFormatId, dataFormatTypeDto);
     }
 
+  
     private void AddDataFormatRecordToRepositories(
         string dataSource,
         string stringIdentifierKey,

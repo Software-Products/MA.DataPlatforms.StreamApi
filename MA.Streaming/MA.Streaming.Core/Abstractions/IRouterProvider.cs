@@ -21,5 +21,15 @@ namespace MA.Streaming.Core.Abstractions;
 
 public interface IRouterProvider
 {
-    IRouter Provide(string dataSource, string stream = "");
+    IRouter ProvideMainStreamRouter(string dataSource);
+
+    IRouter ProvideDataStreamRouter(string dataSource, string stream);
+
+    IRouter ProvideEssentialRouter(string dataSource);
+
+    IRouter ProvideSessionInfoRouter();
+
+    IRouter ProvideSystemStatusRouter();
+
+    IRouter ProvideDeadLetterRouter();
 }

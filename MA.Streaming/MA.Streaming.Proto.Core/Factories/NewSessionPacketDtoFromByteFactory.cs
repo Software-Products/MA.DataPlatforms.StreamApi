@@ -45,7 +45,8 @@ public class NewSessionPacketDtoFromByteFactory : IDtoFromByteFactory<NewSession
                     return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
                 }).ToList(),
                 newSessionPacket.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero,
-                sessionInfoPacketDto);
+                sessionInfoPacketDto,
+                newSessionPacket.CreationTime?.ToDateTime() ?? DateTime.UtcNow);
         }
         catch (Exception ex)
         {
@@ -64,7 +65,10 @@ public class NewSessionPacketDtoFromByteFactory : IDtoFromByteFactory<NewSession
                 sessionInfoPacket.Version,
                 sessionInfoPacket.Identifier,
                 sessionInfoPacket.AssociateSessionKeys,
-                sessionInfoPacket.Details)
+                sessionInfoPacket.Details,
+                sessionInfoPacket.UtcOffset.ToTimeSpan(),
+                sessionInfoPacket.CreationTime.ToDateTime(),
+                sessionInfoPacket.TerminationTime.ToDateTime())
             : null;
         return sessionInfoPacketDto;
     }

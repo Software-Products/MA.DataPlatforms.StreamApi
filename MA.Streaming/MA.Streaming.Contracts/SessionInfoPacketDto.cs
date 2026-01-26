@@ -24,24 +24,33 @@ public class SessionInfoPacketDto
     public readonly string Identifier;
     public readonly IReadOnlyList<string> AssociatedKeys;
     public readonly IReadOnlyDictionary<string, string> Details;
+    public readonly TimeSpan UtcOffset;
+    public readonly DateTime SessionCreationTime;
+    public readonly DateTime SessionTerminationTime;
 
     public SessionInfoPacketDto(
         string type,
         uint version,
         string identifier,
         IReadOnlyList<string> associatedKeys,
-        IReadOnlyDictionary<string, string> details)
+        IReadOnlyDictionary<string, string> details,
+        TimeSpan utcOffset,
+        DateTime sessionCreationTime,
+        DateTime sessionTerminationTime)
     {
         this.Type = type;
         this.Version = version;
         this.Identifier = identifier;
         this.AssociatedKeys = associatedKeys;
         this.Details = details;
+        this.UtcOffset = utcOffset;
+        this.SessionCreationTime = sessionCreationTime;
+        this.SessionTerminationTime = sessionTerminationTime;
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(this.Type, this.Version, this.Identifier, this.AssociatedKeys, this.Details);
+        return HashCode.Combine(this.Type, this.Version, this.Identifier, this.AssociatedKeys, this.Details, this.UtcOffset, this.SessionTerminationTime, this.SessionTerminationTime);
     }
 
     public override bool Equals(object? obj)

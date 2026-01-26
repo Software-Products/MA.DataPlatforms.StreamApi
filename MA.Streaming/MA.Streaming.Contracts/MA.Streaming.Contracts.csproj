@@ -1,16 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>MA.Streaming.Contracts</Title>
-    <Company>Motion Applied</Company>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-	<Description>MA Stream API contracts.</Description>
-	<Authors>Motion Applied</Authors>
-    <RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>MA.Streaming.Contracts</Title>
+		<Company>Motion Applied</Company>
+		<PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+		<Description>MA Stream API contracts.</Description>
+		<Authors>Motion Applied</Authors>
+		<RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
+	</PropertyGroup>
 
 </Project>

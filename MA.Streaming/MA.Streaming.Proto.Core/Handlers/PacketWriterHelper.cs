@@ -50,4 +50,9 @@ public class PacketWriterHelper : IPacketWriterHelper
                 InfoTypeDto.SessionInfo,
                 packet.ToByteArray()));
     }
+
+    public void WriteDataPacket(WriteDataPacketRequestDto writeDataPacketRequestDto)
+    {
+        this.packetWriterConnectorService.WriteDataPacket(writeDataPacketRequestDto);
+    }
 }

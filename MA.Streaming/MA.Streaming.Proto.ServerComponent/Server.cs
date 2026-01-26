@@ -16,6 +16,9 @@
 // </copyright>
 
 using MA.Common.Abstractions;
+using MA.DataPlatforms.Secu4.RouterComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
+using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.Core.Services;
@@ -38,24 +41,46 @@ public sealed class Server : IServer
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
     private readonly bool registerServices;
     private WebApplication? webApp;
+    private bool disposed;
+    private IRouteReadingWritingComponentRepository<KafkaRouter>? routerRepository;
+    private IRouteReadingWritingComponentRepository<KafkaRouteSubscriber>? routeSubscriberRepository;
+    private readonly ILogger? logger;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
         ILoggingDirectoryProvider loggingDirectoryProvider,
-        bool registerServices = false)
+        bool registerServices = false,
+        ILogger? logger = null)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.kafkaBrokerAvailabilityChecker = kafkaBrokerAvailabilityChecker;
         this.loggingDirectoryProvider = loggingDirectoryProvider;
         this.registerServices = registerServices;
+        this.logger = logger;
     }
 
     public void Dispose()
     {
-        this.Stop().Wait();
+        this.Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (this.disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            this.Stop().Wait();
+        }
+
+        this.disposed = true;
     }
 
     public object? GetService(Type serviceType)
@@ -80,6 +105,22 @@ public sealed class Server : IServer
 
     public Task Stop()
     {
+        if (this.routeSubscriberRepository != null)
+        {
+            foreach (var kafkaRouteSubscriber in this.routeSubscriberRepository.GetAll())
+            {
+                kafkaRouteSubscriber.Unsubscribe();
+            }
+        }
+
+        if (this.routerRepository != null)
+        {
+            foreach (var kafkaRouter in this.routerRepository.GetAll())
+            {
+                kafkaRouter.ShutDown();
+            }
+        }
+
         this.cancellationTokenSourceProvider.Provide().Cancel();
 
         var webAppCopy = this.webApp;
@@ -90,23 +131,21 @@ public sealed class Server : IServer
 
     private async Task StartInternal(CancellationToken cancellationToken)
     {
-        // Create the web app builder
-        // This currently uses the port defined in the configuration the default endpoints of http://localhost:5000 
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(
-            this.ConfigureListenOptions
-        );
 
+        builder.WebHost.ConfigureKestrel(this.ConfigureListenOptions);
         builder.Services.AddGrpc();
 
-        // Add services to the container.
-        new ServiceConfigurator(this.streamingApiConfiguration, this.cancellationTokenSourceProvider, this.loggingDirectoryProvider).Configure(
+        new ServiceConfigurator(
+            this.streamingApiConfiguration,
+            this.cancellationTokenSourceProvider,
+            this.loggingDirectoryProvider,
+            this.logger).Configure(
             builder.Services,
             this.registerServices);
 
         this.webApp = builder.Build();
 
-        // Configure the HTTP request pipeline.
         this.webApp.MapGrpcService<PacketWriter>();
         this.webApp.MapGrpcService<PacketReader>();
         this.webApp.MapGrpcService<ConnectionManager>();
@@ -116,8 +155,9 @@ public sealed class Server : IServer
             "/",
             () =>
                 "Communication with this gRPC endpoint must be made through a Stream API client.");
-
-        var logger = this.webApp.Services.GetService<ILogger>();
+        var loggerService = this.webApp.Services.GetService<ILogger>();
+        this.routerRepository = this.webApp.Services.GetService<IRouteReadingWritingComponentRepository<KafkaRouter>>();
+        this.routeSubscriberRepository = this.webApp.Services.GetService<IRouteReadingWritingComponentRepository<KafkaRouteSubscriber>>();
         var kafkaAvailable = false;
         while (!kafkaAvailable &&
                !cancellationToken.IsCancellationRequested)
@@ -128,13 +168,13 @@ public sealed class Server : IServer
                 continue;
             }
 
-            logger?.Error("Kafka is not available will retry in 5 seconds");
+            loggerService?.Error("Kafka is not available will retry in 5 seconds");
             await Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None).WaitAsync(CancellationToken.None);
         }
 
         if (!kafkaAvailable)
         {
-            logger?.Error("Kafka is not available, stopping the server start up");
+            loggerService?.Error("Kafka is not available, stopping the server start up");
             return;
         }
 

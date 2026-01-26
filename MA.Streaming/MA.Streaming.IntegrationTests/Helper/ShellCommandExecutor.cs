@@ -53,7 +53,7 @@ public class ShellCommandExecutor
 
         var psi = new ProcessStartInfo
         {
-            FileName = (Environment.OSVersion.Platform == PlatformID.Win32NT) ? "docker-compose.exe" : "docker-compose",
+            FileName = "docker-compose",
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

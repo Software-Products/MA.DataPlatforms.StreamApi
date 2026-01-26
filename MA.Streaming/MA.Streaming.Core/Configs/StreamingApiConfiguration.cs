@@ -31,8 +31,11 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         bool? useRemoteKeyGenerator = false,
         string? remoteKeyGeneratorServiceAddress = "",
         bool? batchingResponses = false,
-        uint? initialisationTimeoutSeconds = 3)
+        uint? initialisationTimeoutSeconds = 3,
+        uint? terminationTimeoutSeconds = 1,
+        string? domain = null)
     {
+        this.TerminationTimeoutSeconds = terminationTimeoutSeconds ?? 1;
         this.StreamCreationStrategy = streamCreationStrategy ?? StreamCreationStrategy.PartitionBased;
         this.BrokerUrl = brokerUrl ?? "localhost:9092";
         this.PartitionMappings = partitionMappings ?? [];
@@ -43,6 +46,7 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         this.StreamApiPort = streamApiPort ?? 13579;
         this.IntegrateDataFormatManagement = integrateDataFormatManagement ?? true;
         this.IntegrateSessionManagement = integrateSessionManagement ?? true;
+        this.Domain = domain ?? "";
     }
 
     public StreamCreationStrategy StreamCreationStrategy { get; }
@@ -64,4 +68,8 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
     public bool BatchingResponses { get; }
 
     public uint InitialisationTimeoutSeconds { get; }
+
+    public uint TerminationTimeoutSeconds { get; }
+
+    public string Domain { get; }
 }

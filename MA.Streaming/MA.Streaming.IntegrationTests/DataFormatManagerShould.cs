@@ -25,7 +25,6 @@ using MA.Streaming.API;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
-using MA.Streaming.Core.Routing.EssentialsRouting;
 using MA.Streaming.IntegrationTests.Base;
 using MA.Streaming.IntegrationTests.Helper;
 using MA.Streaming.OpenData;
@@ -37,26 +36,28 @@ using Xunit;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class DataFormatManagerShould
 {
-    private const string BrokerUrl = "localhost:9097";
-    private const string DataSource = "DataFormat_Manager_Test_DataSource";
-    private const string Stream1 = "stream1";
-    internal const string Stream2 = "stream2";
+    private const string BrokerUrl = "localhost:9098";
+    private const string DataSourcePrefix = "DFMSDatasorce";
+    private const string DomainPrefix = "DFMSDomain";
+    private const string Stream1 = "Stream1";
+    internal const string Stream2 = "Stream2";
     private const string PreExistEventIdentifier = "event1";
     private readonly DataFormatManagerService.DataFormatManagerServiceClient dataFormatManagerServiceClient;
     private readonly ulong preExistEventUlongIdentifier;
     private readonly List<string> preExistParameterIdentifiersList;
     private readonly ulong preExistParamUlongIdentifier;
 
-    public DataFormatManagerShould(KafkaTestsCleanUpFixture _)
+    private readonly string dataSource;
+
+    public DataFormatManagerShould()
     {
         var keyGenerator = new KeyGeneratorService(new LoggingDirectoryProvider(""));
-        var essentialTopicNameCreator = new EssentialTopicNameCreator();
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
-        var essentialTopic = essentialTopicNameCreator.Create(DataSource);
-        new KafkaClearHelper(BrokerUrl).Clear().Wait();
-        StreamingApiClient.Shutdown();
+
+        var domain1 = DomainCreator.Create(DomainPrefix);
+        this.dataSource = DataSourceCreator.Create(DataSourcePrefix);
 
         this.preExistParamUlongIdentifier = keyGenerator.GenerateUlongKey();
         this.preExistParameterIdentifiersList =
@@ -87,13 +88,6 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
             Identifier = this.preExistEventUlongIdentifier
         };
 
-        kafkaPublishHelper.PublishData(
-            essentialTopic,
-            GetPacketBytes(nameof(DataFormatDefinitionPacket), parameterDataFormatDefinitionPacket.ToByteString()));
-        kafkaPublishHelper.PublishData(
-            essentialTopic,
-            GetPacketBytes(nameof(DataFormatDefinitionPacket), eventDataFormatDefinitionPacket.ToByteString()));
-        Task.Delay(5000).Wait();
         var apiConfigurationProvider =
             new StreamingApiConfigurationProvider(
                 new StreamingApiConfiguration(
@@ -101,15 +95,31 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
                     BrokerUrl,
                     [new PartitionMapping(Stream1, 1), new PartitionMapping(Stream2, 2)],
                     integrateDataFormatManagement: true,
-                    integrateSessionManagement: false));
+                    integrateSessionManagement: false,
+                    domain: domain1,
+                    streamApiPort: ApiPortCreator.CreateNew()));
 
-        StreamingApiClient.Initialise(
+        var routingMappingInfoRepository = new RoutingMappingInfoRepository();
+        var domainNameProvider = new DomainNameProvider(domain1);
+        var domainKafkaRouteMappingInfoCreator = new DomainKafkaRouteMappingInfoCreator(domainNameProvider, apiConfigurationProvider);
+        var kafkaRouteInfoCreator = new KafkaRouteInfoCreator(domainKafkaRouteMappingInfoCreator, apiConfigurationProvider, routingMappingInfoRepository);
+        var essentialTopic = kafkaRouteInfoCreator.CreateEssentialRouteInfo(this.dataSource).KafkaRouteTopicInfo.Topic;
+
+        kafkaPublishHelper.PublishData(
+            essentialTopic,
+            GetPacketBytes(nameof(DataFormatDefinitionPacket), parameterDataFormatDefinitionPacket.ToByteString()));
+        kafkaPublishHelper.PublishData(
+            essentialTopic,
+            GetPacketBytes(nameof(DataFormatDefinitionPacket), eventDataFormatDefinitionPacket.ToByteString()));
+        Task.Delay(5000).Wait();
+        var streamingApiClient1 = StreamingApiClientFactory.Create(
             apiConfigurationProvider.Provide(),
             new CancellationTokenSourceProvider(),
             new KafkaBrokerAvailabilityChecker(),
-            new LoggingDirectoryProvider(""));
-
-        this.dataFormatManagerServiceClient = StreamingApiClient.GetDataFormatManagerClient();
+            new LoggingDirectoryProvider(""),
+            new ConsoleLogger());
+        streamingApiClient1.Initialise();
+        this.dataFormatManagerServiceClient = streamingApiClient1.GetDataFormatManagerClient();
     }
 
     [Fact]
@@ -118,7 +128,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             Event = PreExistEventIdentifier
         };
 
@@ -132,7 +142,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             Parameters =
             {
                 this.preExistParameterIdentifiersList
@@ -149,7 +159,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var getEventRequest = new GetEventRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             DataFormatIdentifier = eventDataFormat
         };
 
@@ -162,7 +172,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var getParametersListRequest = new GetParametersListRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             DataFormatIdentifier = parameterDataFormat
         };
 
@@ -181,7 +191,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         const string NewEvent = "NewEvent";
         var eventDataFormatIdRequest = new GetEventDataFormatIdRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             Event = NewEvent
         };
 
@@ -197,7 +207,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var getEventRequest = new GetEventRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             DataFormatIdentifier = eventDataFormatIdentifier
         };
 
@@ -213,7 +223,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         const string NewParameter2 = "NewParameter2";
         var parameterDataFormatIdRequest = new GetParameterDataFormatIdRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             Parameters =
             {
                 NewParameter1,
@@ -233,7 +243,7 @@ public class DataFormatManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var getParametersListRequest = new GetParametersListRequest
         {
-            DataSource = DataSource,
+            DataSource = this.dataSource,
             DataFormatIdentifier = dataFormatIdentifier
         };
 

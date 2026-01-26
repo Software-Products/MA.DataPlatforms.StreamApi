@@ -16,10 +16,13 @@
 // </copyright>
 
 using Google.Protobuf;
+using MA.Streaming.Contracts;
 
 namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface IPacketWriterHelper
 {
     void WriteInfoPacket(string sessionKey, string packetType, ByteString content, string dataSource);
+
+    void WriteDataPacket(WriteDataPacketRequestDto writeDataPacketRequestDto);
 }

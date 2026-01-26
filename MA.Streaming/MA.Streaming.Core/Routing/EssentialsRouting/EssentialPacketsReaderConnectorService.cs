@@ -16,76 +16,81 @@
 // </copyright>
 
 using MA.Common.Abstractions;
-using MA.DataPlatforms.Secu4.RouteReaderComponent.Abstractions;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core.Abstractions;
 
 namespace MA.Streaming.Core.Routing.EssentialsRouting;
 
 public class EssentialPacketsReaderConnectorService : IEssentialPacketsReaderConnectorService
 {
     private readonly IEssentialRouteReaderFactory essentialRouteReaderFactory;
-    private readonly IRouteBindingInfoRepository bindingInfoRepository;
-    private readonly ILogger logger;
 
     private long connectionId;
     private string? sessionKey;
-    private IRouteReader reader;
+    private IRouteSubscriber? routeSubscriber;
+    private readonly ILogger logger;
+    private string? dataSource;
 
-    public EssentialPacketsReaderConnectorService(
-        IEssentialRouteReaderFactory essentialRouteReaderFactory,
-        IRouteBindingInfoRepository bindingInfoRepository,
-        ILogger logger)
+    public EssentialPacketsReaderConnectorService(IEssentialRouteReaderFactory essentialRouteReaderFactory, ILogger logger)
     {
         this.essentialRouteReaderFactory = essentialRouteReaderFactory;
-        this.bindingInfoRepository = bindingInfoRepository;
         this.logger = logger;
     }
 
     public event EventHandler<PacketReceivedInfoEventArgs>? PacketReceived;
 
-    public event EventHandler<EssentialReadingCompletedEventArgs>? ReadingCompleted;
-
     public void Start(ConnectionDetailsDto connectionDetailsDto)
     {
         this.connectionId = connectionDetailsDto.Id;
         this.sessionKey = connectionDetailsDto.SessionKey;
-        this.reader = this.essentialRouteReaderFactory.Create(connectionDetailsDto);
-        this.reader.PacketReceived += this.Reader_PacketReceived;
-        this.reader.ReadingCompleted += this.Reader_ReadingCompleted;
-        this.reader.StartReading();
+        this.dataSource = connectionDetailsDto.DataSource;
+        this.routeSubscriber = this.essentialRouteReaderFactory.Create(connectionDetailsDto);
+        this.routeSubscriber.PacketReceived += this.Reader_PacketReceived;
+        this.routeSubscriber.Subscribe();
     }
 
-    private void Reader_ReadingCompleted(object? sender, ReadingCompletedEventArgs e)
+    public void Stop()
     {
-        this.ReadingCompleted?.Invoke(this, new EssentialReadingCompletedEventArgs(e.FinishedTime, e.NumberOfItemsRead));
-        this.reader.PacketReceived -= this.Reader_PacketReceived;
-        this.reader.ReadingCompleted -= this.Reader_ReadingCompleted;
+        try
+        {
+            this.logger.Info($"stopping essential reader {this.sessionKey}-{this.connectionId}");
+            if (this.routeSubscriber == null)
+            {
+                return;
+            }
+
+            this.routeSubscriber.PacketReceived -= this.Reader_PacketReceived;
+            this.routeSubscriber.Unsubscribe();
+            this.logger.Info($"essential reader {this.sessionKey}-{this.connectionId} stopped");
+        }
+        catch (Exception ex)
+        {
+            this.logger.Error($"Exception happened on stopping the reader connector service subscriber {ex}");
+        }
     }
 
     private void Reader_PacketReceived(object? sender, RoutingDataPacket e)
     {
-        if (!string.IsNullOrEmpty(this.sessionKey) &&
-            e.Key != this.sessionKey)
+        if (string.IsNullOrEmpty(this.sessionKey) ||
+            e.Key != this.sessionKey ||
+            string.IsNullOrEmpty(this.dataSource))
         {
             return;
         }
 
-        var bindingInfo = this.bindingInfoRepository.GetBindingInfoByRoute(e.Route);
-        if (bindingInfo == null)
-        {
-            this.logger.Error($"binding info for route{e.Route} is not found while listening to the route {e.Route}");
-            return;
-        }
-
-        if (bindingInfo.Stream != Constants.EssentialStreamName)
-        {
-            return;
-        }
+        var packetReceivedInfoEventArgs = new PacketReceivedInfoEventArgs(
+            this.connectionId,
+            this.dataSource,
+            string.Empty,
+            e.Key ?? string.Empty,
+            e.SubmitTime,
+            e.Message);
 
         this.PacketReceived?.Invoke(
             this,
-            new PacketReceivedInfoEventArgs(this.connectionId, bindingInfo.DataSource, string.Empty, e.Key ?? string.Empty, e.SubmitTime, e.Message));
+            packetReceivedInfoEventArgs);
     }
 }

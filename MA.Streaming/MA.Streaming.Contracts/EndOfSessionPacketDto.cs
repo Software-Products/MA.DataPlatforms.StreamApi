@@ -21,10 +21,12 @@ public class EndOfSessionPacketDto
 {
     public readonly string DataSource;
     public readonly IReadOnlyList<TopicPartitionOffsetDto> TopicPartitionsOffset;
+    public readonly DateTime SessionTerminationTime;
 
-    public EndOfSessionPacketDto(string dataSource, IReadOnlyList<TopicPartitionOffsetDto> topicPartitionsOffset)
+    public EndOfSessionPacketDto(string dataSource, IReadOnlyList<TopicPartitionOffsetDto> topicPartitionsOffset, DateTime sessionTerminationTime)
     {
         this.DataSource = dataSource;
         this.TopicPartitionsOffset = topicPartitionsOffset;
+        this.SessionTerminationTime = sessionTerminationTime;
     }
 }

@@ -16,12 +16,11 @@
 // </copyright>
 
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
-using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 
 namespace MA.Streaming.Core.Abstractions;
 
 public interface IRouteSubscriberFactory
 {
-    IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto, IRouteBindingInfoRepository routeBindingInfoRepository);
+    IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto);
 }

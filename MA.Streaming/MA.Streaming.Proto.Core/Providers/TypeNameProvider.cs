@@ -16,6 +16,7 @@
 // </copyright>
 
 using MA.Streaming.Abstraction;
+using MA.Streaming.OpenData;
 
 namespace MA.Streaming.Proto.Core.Providers;
 
@@ -28,4 +29,8 @@ public class TypeNameProvider : ITypeNameProvider
     public string SessionInfoPacketTypeName => "SessionInfo";
 
     public string DataFormatDefinitionPacketTypeName => "DataFormatDefinition";
+
+    public string StreamStartedPacketTypeName => nameof(StreamStartedPacket).Replace(nameof(Packet), string.Empty);
+
+    public string StreamStoppedPacketTypeName => nameof(StreamStoppedPacket).Replace(nameof(Packet), string.Empty);
 }

@@ -15,16 +15,11 @@
 // limitations under the License.
 // </copyright>
 
-using Grpc.Core;
-
-using MA.Streaming.API;
-
 namespace MA.Streaming.Proto.Core.Abstractions;
 
 public interface IEssentialReadRequestHandler
 {
-    void Handle(
-        ReadEssentialsRequest request,
-        IServerStreamWriter<ReadEssentialsResponse> responseStream,
-        ConnectionDetails connectionDetails);
+    public event EventHandler<DateTime>? HandlingStopped;
+
+    void Handle();
 }

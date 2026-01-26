@@ -23,134 +23,188 @@ using Grpc.Net.Client;
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
-using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.ServerComponent;
 
 namespace MA.Streaming.Proto.Client.Local;
 
-public static class StreamingApiClient
+public class StreamingApiClient
 {
-    private static IServer? server;
-    private static GrpcChannel? channel;
+    private readonly IStreamingApiConfiguration streamingApiConfiguration;
+    private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+    private readonly IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker;
+    private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
+    private readonly ILogger? logger;
 
-    public static event EventHandler<DateTime>? ServiceInitialised;
-
-    public static bool Initialised { get; private set; }
-
-    public static void Initialise(
+    internal StreamingApiClient(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
-        ILoggingDirectoryProvider loggingDirectoryProvider)
+        ILoggingDirectoryProvider loggingDirectoryProvider,
+        ILogger? logger)
     {
-        if (Initialised)
+        this.streamingApiConfiguration = streamingApiConfiguration;
+        this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
+        this.kafkaBrokerAvailabilityChecker = kafkaBrokerAvailabilityChecker;
+        this.loggingDirectoryProvider = loggingDirectoryProvider;
+        this.logger = logger;
+        this.cancellationToken = cancellationTokenSourceProvider.Provide().Token;
+    }
+
+    private Server? server;
+    private GrpcChannel? channel;
+
+    public event EventHandler<DateTime>? ServiceInitialised;
+
+    private readonly CancellationToken cancellationToken;
+    private bool stopped;
+
+    public bool Initialised { get; private set; }
+
+    public void Initialise()
+    {
+        if (this.Initialised)
         {
             return;
         }
 
         try
         {
-            server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker, loggingDirectoryProvider);
-            server.Start().Wait(TimeSpan.FromSeconds(10));
-            SetupGrpcChannel(streamingApiConfiguration);
+            this.server = new Server(
+                this.streamingApiConfiguration,
+                this.cancellationTokenSourceProvider,
+                this.kafkaBrokerAvailabilityChecker,
+                this.loggingDirectoryProvider,
+                logger: this.logger);
+            this.server.Start().Wait(TimeSpan.FromSeconds(10));
+            this.SetupGrpcChannel();
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            if (this.logger != null)
+            {
+                this.logger.Error($"Error occurred while initializing StreamingApiClient. {ex}");
+            }
+            else
+            {
+                Console.WriteLine($"Error occurred while initializing StreamingApiClient. {ex} ");
+            }
+
+            this.Shutdown();
             throw;
         }
 
-        Initialised = true;
-        ServiceInitialised?.Invoke(null, DateTime.UtcNow);
+        this.Initialised = true;
+        this.ServiceInitialised?.Invoke(null, DateTime.UtcNow);
     }
 
-    public static async Task InitialiseAsync(
-        IStreamingApiConfiguration streamingApiConfiguration,
-        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
-        IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
-        ILoggingDirectoryProvider loggingDirectoryProvider,
-        CancellationToken cancellationToken)
+    public async Task InitialiseAsync()
     {
         try
         {
-            if (Initialised)
+            if (this.Initialised)
             {
                 return;
             }
 
-            server = new Server(streamingApiConfiguration, cancellationTokenSourceProvider, kafkaBrokerAvailabilityChecker, loggingDirectoryProvider);
-            await server.StartAsync(cancellationToken);
-            SetupGrpcChannel(streamingApiConfiguration);
-            Initialised = true;
-            ServiceInitialised?.Invoke(null, DateTime.UtcNow);
+            this.server = new Server(
+                this.streamingApiConfiguration,
+                this.cancellationTokenSourceProvider,
+                this.kafkaBrokerAvailabilityChecker,
+                this.loggingDirectoryProvider);
+            await this.server.StartAsync(this.cancellationToken);
+            this.SetupGrpcChannel();
+            this.Initialised = true;
+            this.ServiceInitialised?.Invoke(null, DateTime.UtcNow);
         }
         catch (OperationCanceledException)
         {
-            Shutdown();
+            this.Shutdown();
+        }
+
+        catch (Exception ex)
+        {
+            if (this.logger != null)
+            {
+                this.logger.Error($"Error occurred while initializing StreamingApiClient. {ex}");
+            }
+            else
+            {
+                Console.WriteLine($"Error occurred while initializing StreamingApiClient. {ex} ");
+            }
+
+            this.Shutdown();
         }
     }
 
-    public static object? GetService(Type serviceType)
+    public object? GetService(Type serviceType)
     {
-        return server?.GetService(serviceType);
+        return this.server?.GetService(serviceType);
     }
 
-    public static void Shutdown()
+    public void Shutdown()
     {
-        channel?.Dispose();
-        channel = null;
-        server?.Dispose();
-        server = null;
-        Initialised = false;
+        if (this.stopped)
+        {
+            return;
+        }
+
+        this.server?.Stop().Wait(this.cancellationToken);
+        this.channel?.ShutdownAsync().Wait(this.cancellationToken);
+        this.channel?.Dispose();
+        this.channel = null;
+        this.server?.Dispose();
+        this.server = null;
+        this.Initialised = false;
+        this.stopped = true;
     }
 
-    public static ConnectionManagerService.ConnectionManagerServiceClient GetConnectionManagerClient()
+    public ConnectionManagerService.ConnectionManagerServiceClient GetConnectionManagerClient()
     {
-        CheckInitialised();
-        return new ConnectionManagerService.ConnectionManagerServiceClient(channel);
+        this.CheckInitialised();
+        return new ConnectionManagerService.ConnectionManagerServiceClient(this.channel);
     }
 
-    public static DataFormatManagerService.DataFormatManagerServiceClient GetDataFormatManagerClient()
+    public DataFormatManagerService.DataFormatManagerServiceClient GetDataFormatManagerClient()
     {
-        CheckInitialised();
+        this.CheckInitialised();
 
-        return new DataFormatManagerService.DataFormatManagerServiceClient(channel);
+        return new DataFormatManagerService.DataFormatManagerServiceClient(this.channel);
     }
 
-    public static PacketReaderService.PacketReaderServiceClient GetPacketReaderClient()
+    public PacketReaderService.PacketReaderServiceClient GetPacketReaderClient()
     {
-        CheckInitialised();
+        this.CheckInitialised();
 
-        return new PacketReaderService.PacketReaderServiceClient(channel);
+        return new PacketReaderService.PacketReaderServiceClient(this.channel);
     }
 
-    public static PacketWriterService.PacketWriterServiceClient GetPacketWriterClient()
+    public PacketWriterService.PacketWriterServiceClient GetPacketWriterClient()
     {
-        CheckInitialised();
+        this.CheckInitialised();
 
-        return new PacketWriterService.PacketWriterServiceClient(channel);
+        return new PacketWriterService.PacketWriterServiceClient(this.channel);
     }
 
-    public static SessionManagementService.SessionManagementServiceClient GetSessionManagementClient()
+    public SessionManagementService.SessionManagementServiceClient GetSessionManagementClient()
     {
-        CheckInitialised();
+        this.CheckInitialised();
 
-        return new SessionManagementService.SessionManagementServiceClient(channel);
+        return new SessionManagementService.SessionManagementServiceClient(this.channel);
     }
 
-    private static void CheckInitialised()
+    private void CheckInitialised()
     {
-        if (!Initialised)
+        if (!this.Initialised)
         {
             throw new InvalidOperationException(
                 "StreamApi StreamingApiClient has not been initialised. Please call StreamingApiClient.Initialise() or StreamingApiClient.InitialiseAsync() before using the API.");
         }
     }
 
-    private static void SetupGrpcChannel(IStreamingApiConfiguration streamingApiConfiguration)
+    private void SetupGrpcChannel()
     {
-        channel = GrpcChannel.ForAddress(
-            $"http://localhost:{streamingApiConfiguration.StreamApiPort}",
+        this.channel = GrpcChannel.ForAddress(
+            $"http://localhost:{this.streamingApiConfiguration.StreamApiPort}",
             new GrpcChannelOptions
             {
                 HttpHandler = new SocketsHttpHandler

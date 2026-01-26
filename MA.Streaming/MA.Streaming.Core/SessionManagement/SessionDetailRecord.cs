@@ -15,9 +15,6 @@
 // limitations under the License.
 // </copyright>
 
-// <copyright file="SessionDetailRecord.cs" company="McLaren Applied Ltd.">
-// Copyright (c) McLaren Applied Ltd.</copyright>
-
 using MA.Streaming.Contracts;
 
 namespace MA.Streaming.Core.SessionManagement;
@@ -30,6 +27,7 @@ public class SessionDetailRecord
     public readonly long MainOffset;
     public readonly long EssentialOffset;
     public readonly TimeSpan UtcOffset;
+    public readonly DateTime SessionCreationTime;
 
     public SessionDetailRecord(
         string sessionKey,
@@ -38,16 +36,18 @@ public class SessionDetailRecord
         long mainOffset,
         long essentialOffset,
         TimeSpan utcOffset,
-        ulong updateVersion)
+        DateTime sessionCreationTime)
     {
         this.SessionKey = sessionKey;
         this.DataSource = dataSource;
         this.StartingOffsetInfo = startingOffsetInfo;
         this.MainOffset = mainOffset;
         this.EssentialOffset = essentialOffset;
-        this.SessionInfoPacket = new SessionInfoPacketDto("", 0, "", [], new Dictionary<string, string>());
+        this.SessionInfoPacket = new SessionInfoPacketDto("", 0, "", [], new Dictionary<string, string>(), TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow);
         this.Completed = false;
         this.UtcOffset = utcOffset;
+        this.SessionCreationTime = sessionCreationTime;
+        this.SessionTerminationTime = DateTime.UtcNow;
     }
 
     public SessionInfoPacketDto SessionInfoPacket { get; private set; }
@@ -55,6 +55,8 @@ public class SessionDetailRecord
     public bool Completed { get; private set; }
 
     public IReadOnlyList<TopicPartitionOffsetDto> EndingOffsetInfo { get; private set; } = [];
+
+    public DateTime SessionTerminationTime { get; private set; }
 
     public void Complete(IReadOnlyList<TopicPartitionOffsetDto> endingOffsetInfo)
     {
@@ -65,5 +67,10 @@ public class SessionDetailRecord
     public void SetSessionInfo(SessionInfoPacketDto sessionInfoPacket)
     {
         this.SessionInfoPacket = sessionInfoPacket;
+    }
+
+    public void SetSessionTerminationTime(DateTime sessionTerminationTime)
+    {
+        this.SessionTerminationTime = sessionTerminationTime;
     }
 }

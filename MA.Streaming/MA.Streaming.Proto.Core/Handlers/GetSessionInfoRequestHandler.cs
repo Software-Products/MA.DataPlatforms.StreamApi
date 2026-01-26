@@ -75,7 +75,9 @@ public class GetSessionInfoRequestHandler : IGetSessionInfoRequestHandler
                 streams
             },
             UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset),
-            Success = true
+            Success = true,
+            CreationTime = Timestamp.FromDateTime(foundSessionDetail.SessionCreationTime),
+            TerminationTime = foundSessionDetail.Completed ? Timestamp.FromDateTime(foundSessionDetail.SessionTerminationTime) : null
         };
         response.Details.Add(foundSessionDetail.SessionInfoPacket.Details.ToDictionary(detail => detail.Key, detail => detail.Value));
 

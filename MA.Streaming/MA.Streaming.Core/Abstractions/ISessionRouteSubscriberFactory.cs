@@ -21,5 +21,5 @@ namespace MA.Streaming.Core.Abstractions;
 
 public interface ISessionRouteSubscriberFactory
 {
-    IRouteSubscriber Create(string routeName);
+    IRouteSubscriber Create();
 }

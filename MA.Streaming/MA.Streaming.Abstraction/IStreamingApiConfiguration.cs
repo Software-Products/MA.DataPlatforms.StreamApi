@@ -38,4 +38,6 @@ public interface IStreamingApiConfiguration
     bool BatchingResponses { get; }
 
     public uint InitialisationTimeoutSeconds { get; }
+
+    public string Domain { get; }
 }

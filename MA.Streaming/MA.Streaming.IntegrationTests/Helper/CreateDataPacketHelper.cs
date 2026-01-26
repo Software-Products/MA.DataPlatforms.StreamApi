@@ -269,7 +269,7 @@ namespace MA.Streaming.IntegrationTests.Helper
                 },
             };
 
-            synchroDataPacket.Column.Add(columns);
+            synchroDataPacket.Columns.Add(columns);
 
             var info = await this.dataFormatManager.GetParametersListAsync(
                 new GetParametersListRequest

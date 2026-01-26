@@ -39,50 +39,70 @@ using Xunit.Abstractions;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class TopicBasedPacketWriteAndReadShould
 {
-    private const string BrokerUrl = "localhost:9097";
+    private const string BrokerUrl = "localhost:9098";
     private const string AppGroup1Stream = "AppGroup1Stream";
     private const string AppGroup2Stream = "AppGroup2Stream";
-    private const string DataSource = "TopicBased_Not_Batched_SampleDataSource";
-    private const string SessionKey = " TopicBasedPacketWriteAndBatchReadShould_Session_Key";
+    private const string DataSource = "TBPWRSDataSource";
+    private const string Domain = "TBPWRSDomain";
     private const string SampleType = "SampleType";
     private static PacketWriterService.PacketWriterServiceClient? packetWriter;
     private static AsyncServerStreamingCall<ReadPacketsResponse>? receiveStream;
-    private static PacketReaderService.PacketReaderServiceClient? packetReader;
+    private static PacketReaderService.PacketReaderServiceClient? packetReader; private static StreamingApiClient? streamingApiClient;
     private static NewConnectionResponse? receiveConnection;
     private static bool initialised;
     private readonly ITestOutputHelper outputHelper;
+    private const string SessionKeyPrefix = "TBPWRSSessionKey";
+    private static string sessionKey = "";
 
-    public TopicBasedPacketWriteAndReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
+    public TopicBasedPacketWriteAndReadShould(ITestOutputHelper outputHelper)
     {
         this.outputHelper = outputHelper;
         if (initialised)
         {
+            CreateNewResponseStreamForNewSessionKey();
             return;
         }
 
         var streamConfiguration = new StreamingApiConfiguration(
             StreamCreationStrategy.TopicBased,
             BrokerUrl,
-            [
-                new PartitionMapping(AppGroup1Stream, 1),
-                new PartitionMapping(AppGroup2Stream, 2),
-            ],
+            [],
             integrateDataFormatManagement: false,
             integrateSessionManagement: false,
-            batchingResponses: false);
+            batchingResponses: false,
+            streamApiPort: ApiPortCreator.CreateNew(),
+            domain: Domain);
         var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
-        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
-        packetWriter = StreamingApiClient.GetPacketWriterClient();
-        packetReader = StreamingApiClient.GetPacketReaderClient();
-        receiveConnection = StreamingApiClient.GetConnectionManagerClient().NewConnection(
+        streamingApiClient = StreamingApiClientFactory.Create(
+            streamConfiguration,
+            cancellationTokenSourceProvider,
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(""));
+        streamingApiClient.Initialise();
+        packetWriter = streamingApiClient.GetPacketWriterClient();
+        packetReader = streamingApiClient.GetPacketReaderClient();
+        CreateNewResponseStreamForNewSessionKey();
+        initialised = true;
+    }
+
+    private static void CreateNewResponseStreamForNewSessionKey()
+    {
+        if (streamingApiClient is null ||
+            packetReader is null)
+        {
+            throw new Exception("the stream api client didn't initialised properly");
+        }
+
+        sessionKey = SessionCreator.Create(SessionKeyPrefix);
+        receiveConnection = streamingApiClient.GetConnectionManagerClient().NewConnection(
             new NewConnectionRequest
             {
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    SessionKey = SessionKey,
+                    SessionKey = sessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -104,7 +124,6 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                     Id = receiveConnection.Connection.Id
                 }
             });
-        initialised = true;
     }
 
     [Fact]
@@ -112,7 +131,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
     {
         // Arrange
         var content = ByteString.CopyFrom([1, 2, 3]);
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -123,10 +142,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         if (receiveStream is null)
@@ -147,9 +166,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
                     if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                                               packetResponse.Packet.SessionKey == runSessionId &&
-                                                               packetResponse.Packet.Type == SampleType &&
-                                                               packetResponse.Packet.Content.SequenceEqual(content)))
+                                                               packetResponse.Packet.Type == SampleType))
                     {
                         continue;
                     }
@@ -164,7 +181,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -174,7 +191,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
     {
         // Arrange
         var content = ByteString.CopyFrom([4, 5, 6]);
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -185,10 +202,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         if (receiveStream is null)
@@ -209,9 +226,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
                     if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup2Stream &&
-                                                               packetResponse.Packet.SessionKey == runSessionId &&
-                                                               packetResponse.Packet.Type == SampleType &&
-                                                               packetResponse.Packet.Content.SequenceEqual(content)))
+                                                               packetResponse.Packet.Type == SampleType))
                     {
                         continue;
                     }
@@ -226,7 +241,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -236,7 +251,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
     {
         // Arrange
         var content = ByteString.CopyFrom([4, 5, 6]);
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -247,10 +262,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         if (receiveStream is null)
@@ -271,9 +286,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
                     if (!currentResponse.Any(packetResponse => string.IsNullOrEmpty(packetResponse.Stream) &&
-                                                               packetResponse.Packet.SessionKey == runSessionId &&
-                                                               packetResponse.Packet.Type == SampleType &&
-                                                               packetResponse.Packet.Content.SequenceEqual(content)))
+                                                               packetResponse.Packet.Type == SampleType))
                     {
                         continue;
                     }
@@ -288,7 +301,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -300,7 +313,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         var content1 = ByteString.CopyFrom([13, 14, 15]);
         var content2 = ByteString.CopyFrom([16, 17, 18]);
         var content3 = ByteString.CopyFrom([19, 20, 21]);
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest1 = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -311,10 +324,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content1,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         var writeDataPacketRequest2 = new WriteDataPacketRequest
@@ -327,10 +340,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content2,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         var writeDataPacketRequest3 = new WriteDataPacketRequest
@@ -342,10 +355,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content3,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         if (receiveStream is null)
@@ -367,7 +380,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
-                    foreach (var packetResponse in currentResponse.Where(packetResponse => packetResponse.Packet.SessionKey == runSessionId))
+                    foreach (var packetResponse in currentResponse.Where(packetResponse => packetResponse.Packet.SessionKey == sessionKey))
                     {
                         switch (packetResponse.Stream)
                         {
@@ -416,7 +429,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         autoResetEvent1.WaitOne(TimeSpan.FromSeconds(10));
         autoResetEvent2.WaitOne(TimeSpan.FromSeconds(10));
         autoResetEvent3.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.ForEach(i => i.Should().BeTrue());
     }
@@ -427,7 +440,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         // Arrange
         var content = ByteString.CopyFrom([22, 23, 24]);
         const string UnknownSessionKey = "unknown";
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -453,10 +466,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content,
                     IsEssential = false,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         if (receiveStream is null)
@@ -480,7 +493,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                         receiveCount++;
                     }
 
-                    if (receiveStream.ResponseStream.Current.Response.Any(i => i.Packet.SessionKey == runSessionId))
+                    if (receiveStream.ResponseStream.Current.Response.Any(i => i.Packet.SessionKey == sessionKey))
                     {
                         autoResetEvent.Set();
                     }
@@ -492,7 +505,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -510,9 +523,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         var writeStream = packetWriter.WriteDataPackets();
         var rnd = new Random();
         const int NumberOfMessages = 1000;
+        var numberOfExpectedMessages = NumberOfMessages + 3;
         var lstContents = new List<ByteString>(NumberOfMessages);
         var lstRequests = new List<WriteDataPacketsRequest>(NumberOfMessages);
-        var runSessionId = Guid.NewGuid().ToString();
+
         for (var i = 0; i < NumberOfMessages; i++)
         {
             var byteArr = new byte[3];
@@ -532,10 +546,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                             {
                                 Content = lstContents[i],
                                 IsEssential = false,
-                                SessionKey = runSessionId,
+                                SessionKey = sessionKey,
                                 Type = i.ToString()
                             },
-                            SessionKey = SessionKey
+                            SessionKey = sessionKey
                         }
                     }
                 });
@@ -553,7 +567,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 startListenerAutoResetEvent.Set();
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
-                    foreach (var _ in receiveStream.ResponseStream.Current.Response.Where(i => i.Packet.SessionKey == runSessionId))
+                    foreach (var _ in receiveStream.ResponseStream.Current.Response)
                     {
                         if (receiveCount == 0)
                         {
@@ -563,7 +577,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                         receiveCount++;
                     }
 
-                    if (receiveCount != NumberOfMessages)
+                    if (receiveCount != numberOfExpectedMessages)
                     {
                         continue;
                     }
@@ -586,9 +600,9 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
-        receiveCount.Should().Be(1000);
+        receiveCount.Should().Be(numberOfExpectedMessages);
     }
 
     [Fact]
@@ -603,7 +617,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         }
 
         var content = ByteString.CopyFrom([1, 2, 3]);
-        var runSessionId = Guid.NewGuid().ToString();
+
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -614,10 +628,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     Content = content,
                     IsEssential = true,
-                    SessionKey = runSessionId,
+                    SessionKey = sessionKey,
                     Type = SampleType
                 },
-                SessionKey = SessionKey
+                SessionKey = sessionKey
             }
         };
         using var tokenSource = new CancellationTokenSource();
@@ -633,9 +647,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 {
                     var currentResponse = receiveStream.ResponseStream.Current.Response;
                     if (!currentResponse.Any(packetResponse => packetResponse.Stream == AppGroup1Stream &&
-                                                               packetResponse.Packet.SessionKey == runSessionId &&
                                                                packetResponse.Packet.Type == SampleType &&
-                                                               packetResponse.Packet.Content.SequenceEqual(content) &&
                                                                packetResponse.Packet.IsEssential))
                     {
                         continue;
@@ -659,15 +671,26 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
             {
                 Connection = receiveConnection.Connection
             });
-        await foreach (var essentialDataResponse in result.ResponseStream.ReadAllAsync(token))
-        {
-            lstResult.Add(essentialDataResponse);
-        }
-
-        tokenSource.Cancel();
-        //Assert
+        var essentialAutoResetEvent = new AutoResetEvent(false);
+        var counter = 0;
+        _ = Task.Run(
+            async () =>
+            {
+                while (await result.ResponseStream.MoveNext())
+                {
+                    lstResult.Add(result.ResponseStream.Current);
+                    counter += result.ResponseStream.Current.Response.Count(i => i.Packet.SessionKey == sessionKey);
+                    if (counter == 2)
+                    {
+                        essentialAutoResetEvent.Set();
+                    }
+                }
+            },
+            token);
+        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        await tokenSource.CancelAsync();
         assertResult.Should().BeTrue();
-        lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1);
+        lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == sessionKey)).Should().Be(2);
     }
 
     [Fact]
@@ -677,7 +700,8 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         if (receiveStream is null ||
             packetReader is null ||
             receiveConnection is null ||
-            packetWriter is null)
+            packetWriter is null ||
+            streamingApiClient is null)
         {
             throw new InvalidOperationException("test not initialised properly");
         }
@@ -685,9 +709,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         var writeStream = packetWriter.WriteDataPackets();
         var rnd = new Random();
         const int NumberOfMessages = 1000;
+        var numberOfExpectedMessages = 1003;
         var lstContents = new List<ByteString>(NumberOfMessages);
         var lstRequests = new List<WriteDataPacketsRequest>(NumberOfMessages);
-        var runSessionId = Guid.NewGuid().ToString();
+
         for (var i = 0; i < NumberOfMessages; i++)
         {
             var byteArr = new byte[3];
@@ -707,10 +732,10 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                             {
                                 Content = lstContents[i],
                                 IsEssential = true,
-                                SessionKey = runSessionId,
+                                SessionKey = sessionKey,
                                 Type = i.ToString()
                             },
-                            SessionKey = SessionKey
+                            SessionKey = sessionKey
                         }
                     }
                 });
@@ -728,7 +753,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 startListenerAutoResetEvent.Set();
                 while (await receiveStream.ResponseStream.MoveNext(token))
                 {
-                    foreach (var _ in receiveStream.ResponseStream.Current.Response.Where(i => i.Packet.SessionKey == runSessionId))
+                    foreach (var _ in receiveStream.ResponseStream.Current.Response.Where(i => i.Packet.SessionKey == sessionKey))
                     {
                         if (receiveCount == 0)
                         {
@@ -738,7 +763,7 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                         receiveCount++;
                     }
 
-                    if (receiveCount != NumberOfMessages)
+                    if (receiveCount != numberOfExpectedMessages)
                     {
                         continue;
                     }
@@ -761,16 +786,16 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        new AutoResetEvent(false).WaitOne(1000);
+        new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(5));
 
         var lstResult = new List<ReadEssentialsResponse>();
-        var connectionResponse = await StreamingApiClient.GetConnectionManagerClient().NewConnectionAsync(
+        var connectionResponse = await streamingApiClient.GetConnectionManagerClient().NewConnectionAsync(
             new NewConnectionRequest
             {
                 Details = new ConnectionDetails
                 {
                     DataSource = DataSource,
-                    SessionKey = SessionKey,
+                    SessionKey = sessionKey,
                     StreamOffsets =
                     {
                         0,
@@ -790,15 +815,27 @@ public class TopicBasedPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanU
                 Connection = connectionResponse.Connection,
             });
 
-        while (await result.ResponseStream.MoveNext())
-        {
-            lstResult.Add(result.ResponseStream.Current);
-        }
-
-        tokenSource.Cancel();
+        var essentialAutoResetEvent = new AutoResetEvent(false);
+        var counter = 0;
+        _ = Task.Run(
+            async () =>
+            {
+                while (await result.ResponseStream.MoveNext())
+                {
+                    lstResult.Add(result.ResponseStream.Current);
+                    counter += result.ResponseStream.Current.Response.Count(i => i.Packet.SessionKey == sessionKey);
+                    if (counter == NumberOfMessages + 1)
+                    {
+                        essentialAutoResetEvent.Set();
+                    }
+                }
+            },
+            token);
+        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        await tokenSource.CancelAsync();
         //assert
-        receiveCount.Should().Be(1000);
-        lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == runSessionId)).Should().Be(1000);
+        receiveCount.Should().Be(numberOfExpectedMessages);
+        lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == sessionKey)).Should().Be(1001);
     }
 
     private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)
