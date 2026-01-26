@@ -26,23 +26,20 @@ namespace MA.Streaming.Proto.Core.Services;
 
 public sealed class PacketReader : PacketReaderService.PacketReaderServiceBase
 {
-    private readonly IActiveConnectionManager activeConnectionManager;
     private readonly IStreamWriterHandlerFactory streamWriterHandlerFactory;
-    private readonly IEssentialReadRequestHandler essentialReadRequestHandler;
+    private readonly IEssentialReadRequestHandlerFactory essentialReadRequestHandlerFactory;
     private readonly IDataStreamWriterHandlerFactory dataStreamWriterHandlerFactory;
     private readonly IInMemoryRepository<(string, ulong, DataFormatTypeDto), DataFormatRecord> dataFormatByUlongIdentifierRepository;
 
     public PacketReader(
-        IActiveConnectionManager activeConnectionManager,
         IStreamWriterHandlerFactory streamWriterHandlerFactory,
-        IEssentialReadRequestHandler essentialReadRequestHandler,
+        IEssentialReadRequestHandlerFactory essentialReadRequestHandlerFactory,
         IDataStreamWriterHandlerFactory dataStreamWriterHandlerFactory,
         IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository
     )
     {
-        this.activeConnectionManager = activeConnectionManager;
         this.streamWriterHandlerFactory = streamWriterHandlerFactory;
-        this.essentialReadRequestHandler = essentialReadRequestHandler;
+        this.essentialReadRequestHandlerFactory = essentialReadRequestHandlerFactory;
         this.dataStreamWriterHandlerFactory = dataStreamWriterHandlerFactory;
         this.dataFormatByUlongIdentifierRepository = dataFormatByUlongIdentifierRepository;
     }
@@ -53,17 +50,10 @@ public sealed class PacketReader : PacketReaderService.PacketReaderServiceBase
         handler?.StartHandling();
     }
 
-    public override Task ReadEssentials(ReadEssentialsRequest request, IServerStreamWriter<ReadEssentialsResponse> responseStream, ServerCallContext context)
+    public override async Task ReadEssentials(ReadEssentialsRequest request, IServerStreamWriter<ReadEssentialsResponse> responseStream, ServerCallContext context)
     {
-        this.activeConnectionManager.TryGetConnection(request.Connection.Id, out var connectionDetails);
-        if (connectionDetails == null)
-        {
-            return Task.CompletedTask;
-        }
-
-        this.essentialReadRequestHandler.Handle(request, responseStream, connectionDetails);
-
-        return Task.CompletedTask;
+        var handler = await this.essentialReadRequestHandlerFactory.Create(request, responseStream, context);
+        handler?.Handle();
     }
 
     public override async Task ReadDataPackets(ReadDataPacketsRequest request, IServerStreamWriter<ReadDataPacketsResponse> responseStream, ServerCallContext context)

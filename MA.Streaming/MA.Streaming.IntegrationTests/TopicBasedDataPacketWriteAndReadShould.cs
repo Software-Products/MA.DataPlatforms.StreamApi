@@ -40,13 +40,13 @@ using Xunit.Abstractions;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class TopicBasedDataPacketWriteAndReadShould
 {
-    private const string BrokerUrl = "localhost:9097";
+    private const string BrokerUrl = "localhost:9098";
     private const string AppGroup1Stream = "AppGroup1Stream";
     private const string AppGroup2Stream = "AppGroup2Stream";
-    private const string DataSource = "TopicBased_Data_Not_Batched_SampleDataSource";
-    private const string SampleType = "SampleType";
+    private const string DataSource = "TBSPWRSDDataSource";
+    private const string Domain = "TBSPWRSDDomain";
     private const string PeriodicDataType = "PeriodicData";
     private const string RowDataType = "RowData";
     private const string SynchroDataType = "SynchroData";
@@ -64,7 +64,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
     private AsyncServerStreamingCall<ReadDataPacketsResponse>? receiveStream;
     private NewConnectionResponse? receiveConnection;
 
-    public TopicBasedDataPacketWriteAndReadShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
+    public TopicBasedDataPacketWriteAndReadShould(ITestOutputHelper outputHelper)
     {
         this.outputHelper = outputHelper;
         if (initialised)
@@ -81,19 +81,23 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         var streamConfiguration = new StreamingApiConfiguration(
             StreamCreationStrategy.TopicBased,
             BrokerUrl,
-            [
-                new PartitionMapping(AppGroup1Stream, 1),
-                new PartitionMapping(AppGroup2Stream, 2)
-            ],
+            [],
             integrateDataFormatManagement: true,
             integrateSessionManagement: false,
-            batchingResponses: false);
+            batchingResponses: false,
+            domain: Domain,
+            streamApiPort: ApiPortCreator.CreateNew());
         var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
-        StreamingApiClient.Initialise(streamConfiguration, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
-        packetWriter = StreamingApiClient.GetPacketWriterClient();
-        packetReader = StreamingApiClient.GetPacketReaderClient();
-        dataFormatManager = StreamingApiClient.GetDataFormatManagerClient();
-        connectionManager = StreamingApiClient.GetConnectionManagerClient();
+        var streamingApiClient = StreamingApiClientFactory.Create(
+            streamConfiguration,
+            cancellationTokenSourceProvider,
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(""));
+        streamingApiClient.Initialise();
+        packetWriter = streamingApiClient.GetPacketWriterClient();
+        packetReader = streamingApiClient.GetPacketReaderClient();
+        dataFormatManager = streamingApiClient.GetDataFormatManagerClient();
+        connectionManager = streamingApiClient.GetConnectionManagerClient();
 
         initialised = true;
         this.createDataPacketHelper = new CreateDataPacketHelper(DataSource, dataFormatManager, this.outputHelper);
@@ -173,7 +177,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -187,7 +191,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
@@ -249,7 +253,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -263,7 +267,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
@@ -325,7 +329,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -339,7 +343,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
@@ -469,7 +473,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         autoResetEvent1.WaitOne(TimeSpan.FromSeconds(10));
         autoResetEvent2.WaitOne(TimeSpan.FromSeconds(10));
         autoResetEvent3.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.ForEach(i => i.Should().BeTrue());
     }
@@ -483,7 +487,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
@@ -558,7 +562,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -567,19 +571,21 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
     public async Task When_Publish_1000_Data_Using_WriteStream_And_SessionKey_All_Messages_Should_Be_Delivered()
     {
         // Arrange
-        if (packetWriter is null ||
-            this.createDataPacketHelper is null)
-        {
-            throw new InvalidOperationException("test not initialised properly");
-        }
-
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
         var runSessionId = Guid.NewGuid().ToString();
 
         this.ConfigureReceiveStream(runSessionId);
+
+        if (packetWriter is null ||
+            this.createDataPacketHelper is null ||
+            this.receiveStream is null)
+        {
+            throw new InvalidOperationException("test not initialised properly");
+        }
+       
         var writeStream = packetWriter.WriteDataPackets();
         var rnd = new Random();
         const int NumberOfMessages = 1000;
@@ -658,7 +664,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(1000);
     }
@@ -734,7 +740,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -814,7 +820,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -828,7 +834,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var parameters = new List<string>()
+        var parameters = new List<string>
         {
             "IncludeParameter"
         };
@@ -850,7 +856,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         var periodicDataPacket = await this.createDataPacketHelper.CreatePeriodicDataPacket(parameters, 4001);
 
         var periodicContent = periodicDataPacket.ToByteString();
-        var markerConent = markerPacket.ToByteString();
+        var markerContent = markerPacket.ToByteString();
         var writeDataPacketRequest = new WriteDataPacketRequest
         {
             Detail = new DataPacketDetails
@@ -859,7 +865,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
                 Stream = AppGroup1Stream,
                 Message = new Packet
                 {
-                    Content = markerConent,
+                    Content = markerContent,
                     IsEssential = false,
                     SessionKey = runSessionId,
                     Type = MarkerType
@@ -915,7 +921,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -929,11 +935,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1013,7 +1019,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1027,11 +1033,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1112,7 +1118,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1126,11 +1132,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1211,7 +1217,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1225,11 +1231,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1310,7 +1316,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1324,11 +1330,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1409,7 +1415,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1423,11 +1429,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1508,7 +1514,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1601,7 +1607,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1694,7 +1700,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1794,7 +1800,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         await this.WriteDataPacket(writeExcludePacketRequest);
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
     }
@@ -1808,11 +1814,11 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
             throw new InvalidOperationException("Create Data Packet Helper is null which shouldn't be");
         }
 
-        var includeParameters = new List<string>()
+        var includeParameters = new List<string>
         {
             "IncludeParameter123"
         };
-        var excludeParameters = new List<string>()
+        var excludeParameters = new List<string>
         {
             "ExcludeParameter123"
         };
@@ -1883,7 +1889,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         // Act
         await this.WriteDataPacket(writeIncludePacketRequest);
         autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-        tokenSource.Cancel();
+        await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
     }
@@ -1920,9 +1926,7 @@ public class TopicBasedDataPacketWriteAndReadShould : IClassFixture<KafkaTestsCl
         if (request is null)
         {
             // If not specified, then allow everything. 
-            request = new DataPacketRequest
-            {
-            };
+            request = new DataPacketRequest();
         }
 
         this.receiveConnection = connectionManager.NewConnection(

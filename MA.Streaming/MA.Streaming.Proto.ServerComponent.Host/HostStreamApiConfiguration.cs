@@ -40,4 +40,8 @@ internal class HostStreamApiConfiguration
     public bool? BatchingResponses { get; set; }
 
     public uint? InitialisationTimeoutSeconds { get; set; }
+
+    public uint? TerminationTimeoutSeconds { get; set; }
+
+    public string? Domain { get; set; }
 }

@@ -18,6 +18,8 @@
 using MA.Common;
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.RouterComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
@@ -28,8 +30,6 @@ using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.DataFormatManagement;
 using MA.Streaming.Core.Routing;
 using MA.Streaming.Core.Routing.EssentialsRouting;
-using MA.Streaming.Core.Routing.PartitionsRouting;
-using MA.Streaming.Core.Routing.TopicsRouting;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Core;
@@ -53,41 +53,54 @@ public class ServiceConfigurator
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
+    private readonly ILogger? logger;
 
     public ServiceConfigurator(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
-        ILoggingDirectoryProvider loggingDirectoryProvider)
+        ILoggingDirectoryProvider loggingDirectoryProvider,
+        ILogger? logger)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.loggingDirectoryProvider = loggingDirectoryProvider;
+        this.logger = logger;
     }
 
     public void Configure(IServiceCollection serviceCollection, bool registerServices)
     {
-        ConfigureLogging(
-            serviceCollection,
-            logging =>
-            {
-                logging.ClearProviders();
-                logging.SetMinimumLevel(LogLevel.Warning);
-                logging.AddConsole();
-            });
-
+        ConfigureLogging(serviceCollection, this.logger);
         serviceCollection.AddSingleton<IStreamingApiConfigurationProvider>(new StreamingApiConfigurationProvider(this.streamingApiConfiguration));
         serviceCollection.AddSingleton<IRouteManager, KafkaRouteManager>();
         serviceCollection.AddSingleton<IActiveConnectionManager, ActiveConnectionManager>();
-        serviceCollection.AddSingleton<IRouteBindingInfoRepository, RouteBindingInfoRepository>();
+        serviceCollection.AddSingleton<IDomainNameProvider>(new DomainNameProvider(this.streamingApiConfiguration.Domain));
         serviceCollection.AddSingleton<IStreamWriterHandlerFactory, StreamWriterHandlerFactory>();
         serviceCollection.AddSingleton(this.cancellationTokenSourceProvider);
         serviceCollection.AddSingleton<IInMemoryRepository<string, SessionDetailRecord>, ThreadSafeInMemoryRepository<string, SessionDetailRecord>>();
         serviceCollection.AddSingleton<IInMemoryRepository<string, List<DataFormatRecord>>, ThreadSafeInMemoryRepository<string, List<DataFormatRecord>>>();
+        serviceCollection.AddSingleton<IRouteReadingWritingComponentRepository<KafkaRouter>, RouteReadingWritingComponentRepository<KafkaRouter>>();
+        serviceCollection.AddSingleton<IRouteReadingWritingComponentRepository<KafkaRouteSubscriber>, RouteReadingWritingComponentRepository<KafkaRouteSubscriber>>();
         serviceCollection.AddSingleton<IDataFormatInfoService, DataFormatInfoService>();
         serviceCollection.AddSingleton<ISessionInfoService, SessionInfoService>();
         serviceCollection.AddSingleton<IStreamReaderHandlerFactory, StreamReaderHandlerFactory>();
         serviceCollection.AddSingleton<IDataSourcesRepository, DataSourcesRepository>();
         serviceCollection.AddSingleton<ISessionNotificationManagerService, SessionNotificationManagerService>();
+        serviceCollection.AddSingleton<IDomainKafkaRouteMappingInfoCreator, DomainKafkaRouteMappingInfoCreator>();
+        serviceCollection.AddSingleton<IKafkaRouteInfoCreator, KafkaRouteInfoCreator>();
+        serviceCollection.AddSingleton<IKafkaBrokerRoutesOffsetExtractor, KafkaBrokerRoutesOffsetExtractor>();
+        serviceCollection.AddSingleton<IRoutingMappingInfoRepository, RoutingMappingInfoRepository>();
+        serviceCollection.AddSingleton<IEssentialRouterProvider, EssentialRouterProvider>();
+        serviceCollection.AddSingleton<IDataRouterProvider, DataRouterProvider>();
+        serviceCollection.AddSingleton<IEssentialRouteReaderFactory, EssentialRouteReaderFactory>();
+        serviceCollection.AddSingleton<IEssentialRouterConfigurationProvider, EssentialRouterConfigurationProvider>();
+        serviceCollection.AddTransient<IEssentialReadRequestHandlerFactory, EssentialReadRequestHandlerFactory>();
+        serviceCollection.AddSingleton<IRouterProvider, RouterProvider>();
+        serviceCollection.AddSingleton<IRouteSubscriberFactory, RouteSubscriberFactory>();
+        serviceCollection.AddSingleton<IRoutingConfigurationProviderCreator, RoutingConfigurationProviderCreator>();
+        serviceCollection.AddSingleton<IDomainRouterProvider, DomainRouterProvider>();
+        serviceCollection.AddSingleton<IDataSourceRoutingInfoTracker, DataSourceRoutingInfoTracker>();
+        serviceCollection.AddSingleton<IConsumingConfigurationProviderCreator, ConsumingConfigurationProviderCreator>();
+        serviceCollection.AddSingleton<IStreamStopPacketWriterTracker, StreamStopPacketWriterTracker>();
 
         serviceCollection
             .AddSingleton<IInMemoryRepository<long, IReadPacketResponseStreamWriterHandler>,
@@ -111,8 +124,13 @@ public class ServiceConfigurator
             .AddSingleton<INotificationStreamWriterService<GetSessionStopNotificationResponse>,
                 NotificationStreamWriterService<GetSessionStopNotificationResponse>>();
 
+        serviceCollection.AddSingleton<IStreamStartedPacketRequestFactory, StreamStartedPacketRequestFactory>();
+        serviceCollection.AddSingleton<IStreamStoppedPacketRequestFactory, StreamStoppedPacketRequestFactory>();
+        serviceCollection.AddSingleton<ISessionPacketWritingLogProvider, SessionPacketWritingLogProvider>();
+        serviceCollection.AddSingleton<IStreamManager, StreamManager>();
         serviceCollection.AddSingleton<IPacketWriterConnectorService, PacketWriterConnectorService>();
         serviceCollection.AddSingleton<IStreamsProvider, StreamsProvider>();
+        serviceCollection.AddSingleton<ISessionStreamRoutingPacketTracker, SessionStreamRoutingPacketTracker>();
 
         serviceCollection.AddTransient(_ => this.loggingDirectoryProvider);
         serviceCollection.AddTransient<ISessionCreationRequestHandler, SessionCreationRequestHandler>();
@@ -128,13 +146,7 @@ public class ServiceConfigurator
         serviceCollection.AddTransient<IMapper<WriteInfoPacketRequest, WriteInfoPacketRequestDto>, WriteInfoPacketRequestDtoMapper>();
         serviceCollection.AddTransient<IMapper<WriteInfoPacketsRequest, WriteInfoPacketRequestDto>, WriteInfoPacketsRequestDtoMapper>();
         serviceCollection.AddTransient<IMapper<ConnectionInfo, ConnectionDetailsDto>, ConnectionDetailDtoMapper>();
-        serviceCollection.AddTransient<ILogger, MicrosoftLoggerAdapter>();
-        serviceCollection.AddTransient<IRouteNameExtractor, RouteNameExtractor>();
-        serviceCollection.AddTransient<ITopicBaseTopicNameCreator, TopicBaseTopicNameCreator>();
-        serviceCollection.AddTransient<IEssentialTopicNameCreator, EssentialTopicNameCreator>();
-        serviceCollection.AddTransient<IEssentialRouteReaderFactory, EssentialRouteReaderFactory>();
         serviceCollection.AddTransient<IEssentialPacketsReaderConnectorService, EssentialPacketsReaderConnectorService>();
-        serviceCollection.AddTransient<IEssentialReadRequestHandler, EssentialReadRequestHandler>();
         serviceCollection.AddTransient<IDataStreamWriterHandlerFactory, DataStreamWriterHandlerFactory>();
         serviceCollection.AddTransient<IIdentifierFilter, IdentifierFilter>();
         serviceCollection.AddTransient<IStreamWriterRepositoryFactory, StreamWriterRepositoryFactory>();
@@ -160,31 +172,33 @@ public class ServiceConfigurator
             serviceCollection.AddSingleton<IKeyGeneratorService, KeyGeneratorService>();
         }
 
-        if (this.streamingApiConfiguration.StreamCreationStrategy == StreamCreationStrategy.PartitionBased)
+        if (!registerServices)
         {
-            serviceCollection.AddSingleton<IRouterProvider, PartitionBasedRouterProvider>();
-            serviceCollection.AddTransient<IRouteSubscriberFactory, PartitionBasedRouteSubscriberFactory>();
-            serviceCollection.AddTransient<IRouteInfoProvider, PartitionBasedKafkaRouteInfoProvider>();
+            return;
+        }
+
+        serviceCollection.AddTransient<ConnectionManager>();
+        serviceCollection.AddTransient<DataFormatManager>();
+        serviceCollection.AddTransient<PacketWriter>();
+        serviceCollection.AddTransient<PacketReader>();
+        serviceCollection.AddTransient<SessionManager>();
+    }
+
+    private static void ConfigureLogging(IServiceCollection services, ILogger? customLogger)
+    {
+        if (customLogger != null)
+        {
+            services.AddSingleton(customLogger);
         }
         else
         {
-            serviceCollection.AddSingleton<IRouterProvider, TopicBasedRouterProvider>();
-            serviceCollection.AddTransient<IRouteSubscriberFactory, TopicBasedRouteSubscriberFactory>();
-            serviceCollection.AddTransient<IRouteInfoProvider, TopicBasedKafkaRouteInfoProvider>();
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.ClearProviders();
+                loggingBuilder.AddConsole();
+                loggingBuilder.SetMinimumLevel(LogLevel.Warning);
+            });
+            services.AddTransient<ILogger, MicrosoftLoggerAdapter>();
         }
-
-        if (registerServices)
-        {
-            serviceCollection.AddTransient<ConnectionManager>();
-            serviceCollection.AddTransient<DataFormatManager>();
-            serviceCollection.AddTransient<PacketWriter>();
-            serviceCollection.AddTransient<PacketReader>();
-            serviceCollection.AddTransient<SessionManager>();
-        }
-    }
-
-    private static void ConfigureLogging(IServiceCollection services, Action<ILoggingBuilder> configureLogging)
-    {
-        services.AddLogging(configureLogging);
     }
 }

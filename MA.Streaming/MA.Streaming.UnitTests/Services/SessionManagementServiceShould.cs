@@ -26,6 +26,7 @@ using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.OpenData;
+using MA.Streaming.Proto.Core.Factories;
 using MA.Streaming.Proto.Core.Handlers;
 using MA.Streaming.Proto.Core.Model;
 using MA.Streaming.Proto.Core.Providers;
@@ -44,45 +45,52 @@ public class SessionManagementServiceShould
 
     private static readonly Random Rnd = new();
     private readonly SessionManager sessionManager;
-    private readonly IRouteInfoProvider routeInfoProvider;
+    private readonly IKafkaBrokerRoutesOffsetExtractor kafkaBrokerRoutesOffsetExtractor;
     private readonly IKeyGeneratorService sessionKeyGenerator;
     private readonly IPacketWriterConnectorService writeConnectorService;
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoMemoryRepository;
     private readonly ILogger logger;
     private readonly TypeNameProvider typeNameProvider;
     private readonly ISessionInfoService sessionInfoService;
+    private readonly ISessionPacketWritingLogProvider sessionPacketWritingLogProvider;
+    private readonly IStreamManager streamManager;
 
     public SessionManagementServiceShould()
     {
         this.sessionKeyGenerator = Substitute.For<IKeyGeneratorService>();
-        this.routeInfoProvider = Substitute.For<IRouteInfoProvider>();
+        this.kafkaBrokerRoutesOffsetExtractor = Substitute.For<IKafkaBrokerRoutesOffsetExtractor>();
         var streamsProvider1 = Substitute.For<IStreamsProvider>();
         this.writeConnectorService = Substitute.For<IPacketWriterConnectorService>();
         this.sessionInfoService = Substitute.For<ISessionInfoService>();
         this.sessionInfoMemoryRepository = Substitute.For<IInMemoryRepository<string, SessionDetailRecord>>();
+        this.sessionPacketWritingLogProvider = Substitute.For<ISessionPacketWritingLogProvider>();
         var configProvider = Substitute.For<IStreamingApiConfigurationProvider>();
         configProvider.Provide().IntegrateSessionManagement.Returns(true);
         configProvider.Provide().InitialisationTimeoutSeconds.Returns(5u);
         var cancellationTokenSourceProvider = Substitute.For<ICancellationTokenSourceProvider>();
         cancellationTokenSourceProvider.Provide().Returns(new CancellationTokenSource());
         this.logger = Substitute.For<ILogger>();
+        this.streamManager = Substitute.For<IStreamManager>();
 
         this.sessionKeyGenerator.GenerateStringKey().Returns(_ => SessionKey);
 
         this.typeNameProvider = new TypeNameProvider();
         this.sessionManager = new SessionManager(
             new SessionCreationRequestHandler(
-                this.routeInfoProvider,
+                this.kafkaBrokerRoutesOffsetExtractor,
                 this.typeNameProvider,
                 this.sessionKeyGenerator,
                 new PacketWriterHelper(this.writeConnectorService),
                 this.sessionInfoService),
             new SessionEndingRequestHandler(
-                this.routeInfoProvider,
+                this.kafkaBrokerRoutesOffsetExtractor,
                 this.typeNameProvider,
                 this.sessionInfoMemoryRepository,
                 new PacketWriterHelper(this.writeConnectorService),
-                this.sessionInfoService),
+                this.sessionInfoService,
+                this.sessionPacketWritingLogProvider,
+                new StreamStoppedPacketRequestFactory(this.typeNameProvider),
+                this.streamManager),
             new GetSessionInfoRequestHandler(this.sessionInfoMemoryRepository, streamsProvider1),
             new SessionIdentifierUpdateRequestHandler(
                 this.sessionInfoMemoryRepository,
@@ -114,8 +122,8 @@ public class SessionManagementServiceShould
     public async Task Call_GenerateKey_GetTopicPartitions_WriteInfoPacket_OnCreateSession()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        this.routeInfoProvider.GetRouteInfo(DataSourceName).Returns(routeInfos);
+        var partitionOffsets = CreateRandomTopicOffset(4);
+        this.kafkaBrokerRoutesOffsetExtractor.Extract(DataSourceName).Returns(partitionOffsets);
         var request = new CreateSessionRequest
         {
             DataSource = DataSourceName,
@@ -134,7 +142,7 @@ public class SessionManagementServiceShould
         createSessionResponse.SessionKey.Should().Be(SessionKey);
         createSessionResponse.NewSession.DataSource.Should().Be(DataSourceName);
         this.sessionKeyGenerator.Received(1).GenerateStringKey();
-        this.routeInfoProvider.Received(1).GetRouteInfo(DataSourceName);
+        this.kafkaBrokerRoutesOffsetExtractor.Received(1).Extract(DataSourceName);
         this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Any<WriteInfoPacketRequestDto>());
         this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.NewSessionPacketTypeName));
     }
@@ -143,39 +151,50 @@ public class SessionManagementServiceShould
     public async Task Call_GetTopicPartitions_WriteInfoPacket_OnEndSession()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        this.routeInfoProvider.GetRouteInfo(DataSourceName).Returns(routeInfos);
+        var partitionOffsets = CreateRandomTopicOffset(4);
+        this.kafkaBrokerRoutesOffsetExtractor.Extract(DataSourceName).Returns(partitionOffsets);
+        var sessionWritingLog = Substitute.For<ISessionPacketWritingLog>();
+        this.sessionPacketWritingLogProvider.Provide(DataSourceName, SessionKey).Returns(sessionWritingLog);
+        sessionWritingLog.GetActiveStreams().Returns(["stream1", "stream2"]);
+        sessionWritingLog.GetWhenLastUpdated().Returns(DateTimeOffset.Now.Subtract(TimeSpan.FromSeconds(1)).DateTime);
+        this.streamManager.CheckIfStreamIsEnded(DataSourceName, SessionKey, Arg.Any<string>()).Returns(true);
+
         var request = new EndSessionRequest
         {
             DataSource = DataSourceName,
             SessionKey = SessionKey
         };
         var context = Substitute.For<ServerCallContext>();
-        this.sessionInfoMemoryRepository.Get(SessionKey).Returns(new SessionDetailRecord(SessionKey, DataSourceName, [], 0, 0, TimeSpan.Zero, 0));
-        this.sessionInfoService.EndSession(Arg.Any<string>(), Arg.Any<IReadOnlyList<TopicPartitionOffsetDto>>()).Returns((true, "ok"));
+        this.sessionInfoMemoryRepository.Get(SessionKey).Returns(new SessionDetailRecord(SessionKey, DataSourceName, [], 0, 0, TimeSpan.Zero, DateTime.UtcNow));
+        this.sessionInfoService.EndSession(Arg.Any<string>(), Arg.Any<IReadOnlyList<TopicPartitionOffsetDto>>(), Arg.Any<DateTime>()).Returns((true, "ok"));
 
         // Act
         var endSessionResponse = await this.sessionManager.EndSession(request, context);
 
         // Assert
         endSessionResponse.Should().NotBeNull();
-        endSessionResponse?.Success.Should().BeTrue();
-        endSessionResponse?.EndSession.DataSource.Should().Be(DataSourceName);
-        endSessionResponse?.EndSession.TopicPartitionOffsets.Count.Should().Be(4);
-        endSessionResponse?.EndSession.TopicPartitionOffsets.Values.Should().BeEquivalentTo(routeInfos.Select(i => i.Offset));
-        endSessionResponse?.EndSession.TopicPartitionOffsets.Keys.Should().BeEquivalentTo(routeInfos.Select(i => $"{i.Topic}:{i.Partition}"));
+        endSessionResponse.Success.Should().BeTrue();
+        endSessionResponse.EndSession.DataSource.Should().Be(DataSourceName);
+        endSessionResponse.EndSession.TopicPartitionOffsets.Count.Should().Be(4);
+        endSessionResponse.EndSession.TopicPartitionOffsets.Values.Should().BeEquivalentTo(partitionOffsets.Select(i => i.Offset));
+        endSessionResponse.EndSession.TopicPartitionOffsets.Keys.Should().BeEquivalentTo(partitionOffsets.Select(i => $"{i.TopicName}:{i.Partition}"));
 
         this.writeConnectorService.Received(1).WriteInfoPacket(Arg.Any<WriteInfoPacketRequestDto>());
         this.writeConnectorService.Received(1)
             .WriteInfoPacket(Arg.Is<WriteInfoPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.EndOfSessionPacketTypeName));
+        this.writeConnectorService.Received(2).WriteDataPacket(Arg.Any<WriteDataPacketRequestDto>());
+        this.writeConnectorService.Received(1).WriteDataPacket(
+            Arg.Is<WriteDataPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.StreamStoppedPacketTypeName && x.Stream == "stream1"));
+        this.writeConnectorService.Received(1).WriteDataPacket(
+            Arg.Is<WriteDataPacketRequestDto>(x => x.Message.Type == this.typeNameProvider.StreamStoppedPacketTypeName && x.Stream == "stream2"));
     }
 
     [Fact]
     public async Task Return_Empty_When_There_Is_No_SessionInfo_WriteInfoPacket_OnEndSession()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        this.routeInfoProvider.GetRouteInfo(DataSourceName).Returns(routeInfos);
+        var partitionOffsets = CreateRandomTopicOffset(4);
+        this.kafkaBrokerRoutesOffsetExtractor.Extract(DataSourceName).Returns(partitionOffsets);
         var request = new EndSessionRequest
         {
             DataSource = DataSourceName,
@@ -195,13 +214,13 @@ public class SessionManagementServiceShould
     public async Task Return_All_Session_With_Defined_DataSource()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var partitionOffsets = CreateRandomTopicOffset(4);
+        this.kafkaBrokerRoutesOffsetExtractor.Extract(DataSourceName).Returns(partitionOffsets);
         this.sessionInfoMemoryRepository.GetAll().Returns(
             new List<SessionDetailRecord>
             {
-                new(SessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0),
-                new("testSessionKey", "Unknown", topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0)
+                new(SessionKey, DataSourceName, partitionOffsets, 0, 0, TimeSpan.Zero, DateTime.UtcNow),
+                new("testSessionKey", "Unknown", partitionOffsets, 0, 0, TimeSpan.Zero, DateTime.UtcNow)
             });
         var request = new GetCurrentSessionsRequest
         {
@@ -221,12 +240,11 @@ public class SessionManagementServiceShould
     public async Task Return_SessionInfo_With_Specified_Id_In_The_Request()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var topicPartitionsOffsetInfo = CreateRandomTopicOffset(4);
         var sessionKey1 = Guid.NewGuid().ToString();
         var sessionKey2 = Guid.NewGuid().ToString();
-        var sessionDetailRecord1 = new SessionDetailRecord(sessionKey1, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0);
-        var sessionDetailRecord2 = new SessionDetailRecord(sessionKey2, "DataSource2", topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0);
+        var sessionDetailRecord1 = new SessionDetailRecord(sessionKey1, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, DateTime.UtcNow);
+        var sessionDetailRecord2 = new SessionDetailRecord(sessionKey2, "DataSource2", topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, DateTime.UtcNow);
         var sessionDetails1 = new Dictionary<string, string>
         {
             ["DetailName1"] = "DetailValue1"
@@ -235,8 +253,8 @@ public class SessionManagementServiceShould
         {
             ["DetailName2"] = "DetailValue2"
         };
-        sessionDetailRecord1.SetSessionInfo(new SessionInfoPacketDto("1", 1, "Id1", ["1.1,1.2,1.3"], sessionDetails1));
-        sessionDetailRecord2.SetSessionInfo(new SessionInfoPacketDto("2", 2, "Id2", ["2.1,2.2,2.3"], sessionDetails2));
+        sessionDetailRecord1.SetSessionInfo(new SessionInfoPacketDto("1", 1, "Id1", ["1.1,1.2,1.3"], sessionDetails1, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow));
+        sessionDetailRecord2.SetSessionInfo(new SessionInfoPacketDto("2", 2, "Id2", ["2.1,2.2,2.3"], sessionDetails2, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey1)).Returns(sessionDetailRecord1);
         var request = new GetSessionInfoRequest
         {
@@ -285,15 +303,14 @@ public class SessionManagementServiceShould
     public async Task Update_Identifier_When_SessionInfo_Exist()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var topicPartitionsOffsetInfo = CreateRandomTopicOffset(4);
         var sessionKey = Guid.NewGuid().ToString();
-        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0);
+        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, DateTime.UtcNow);
         const string Type = "1";
         const uint Version = 1;
         IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
         IReadOnlyDictionary<string, string> sessionDetails = new Dictionary<string, string>();
-        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, "Id1", topicPartitionOffset, sessionDetails));
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, "Id1", topicPartitionOffset, sessionDetails, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
         const string NewIdentifier = "Id2";
         var request = new UpdateSessionIdentifierRequest
@@ -309,7 +326,7 @@ public class SessionManagementServiceShould
 
         // Assert
         updateSessionIdentifierResponse.Should().NotBeNull();
-        updateSessionIdentifierResponse?.Success.Should().BeTrue();
+        updateSessionIdentifierResponse.Success.Should().BeTrue();
         this.writeConnectorService.Received(1).WriteInfoPacket(
             Arg.Is<WriteInfoPacketRequestDto>(req =>
                 req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
@@ -345,17 +362,18 @@ public class SessionManagementServiceShould
     public async Task Update_Details_When_SessionInfo_Exists()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var topicPartitionsOffsetInfo = CreateRandomTopicOffset(4);
         var sessionKey = Guid.NewGuid().ToString();
-        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0);
+        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, DateTime.UtcNow);
         const string Type = "1";
         const uint Version = 1;
         const string Identifier = "Id";
         IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
-        var sessionDetails = new Dictionary<string, string>();
-        sessionDetails["DetailName1"] = "DetailValue1";
-        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails));
+        var sessionDetails = new Dictionary<string, string>
+        {
+            ["DetailName1"] = "DetailValue1"
+        };
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
         var request = new UpdateSessionDetailsRequest
         {
@@ -372,7 +390,7 @@ public class SessionManagementServiceShould
 
         // Assert
         updateSessionDetailResponse.Should().NotBeNull();
-        updateSessionDetailResponse?.Success.Should().BeTrue();
+        updateSessionDetailResponse.Success.Should().BeTrue();
         this.writeConnectorService.Received(1).WriteInfoPacket(
             Arg.Is<WriteInfoPacketRequestDto>(req =>
                 req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
@@ -410,16 +428,15 @@ public class SessionManagementServiceShould
     public async Task Add_Associate_Id_When_SessionInfo_Exist()
     {
         // Arrange 
-        var routeInfos = CreateRandomRouteInfo(4);
-        var topicPartitionsOffsetInfo = routeInfos.Select(i => new TopicPartitionOffsetDto(i.Topic, i.Partition, i.Offset)).ToList();
+        var topicPartitionsOffsetInfo = CreateRandomTopicOffset(4);
         var sessionKey = Guid.NewGuid().ToString();
-        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, 0);
+        var sessionDetailRecord = new SessionDetailRecord(sessionKey, DataSourceName, topicPartitionsOffsetInfo, 0, 0, TimeSpan.Zero, DateTime.UtcNow);
         const string Type = "1";
         const uint Version = 1;
         const string Identifier = "Id1";
         IReadOnlyList<string> topicPartitionOffset = ["1.1,1.2,1.3"];
         IReadOnlyDictionary<string, string> sessionDetails = new Dictionary<string, string>();
-        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails));
+        sessionDetailRecord.SetSessionInfo(new SessionInfoPacketDto(Type, Version, Identifier, topicPartitionOffset, sessionDetails, TimeSpan.Zero, DateTime.UtcNow, DateTime.UtcNow));
         this.sessionInfoMemoryRepository.Get(Arg.Is(sessionKey)).Returns(sessionDetailRecord);
 
         const string NewAssociatedId = "1.4";
@@ -436,7 +453,7 @@ public class SessionManagementServiceShould
 
         // Assert
         addAssociateSessionResponse.Should().NotBeNull();
-        addAssociateSessionResponse?.Success.Should().BeTrue();
+        addAssociateSessionResponse.Success.Should().BeTrue();
         this.writeConnectorService.Received(1).WriteInfoPacket(
             Arg.Is<WriteInfoPacketRequestDto>(req =>
                 req.Message.Type == this.typeNameProvider.SessionInfoPacketTypeName
@@ -451,12 +468,12 @@ public class SessionManagementServiceShould
             ));
     }
 
-    private static IReadOnlyList<KafkaRouteInfo> CreateRandomRouteInfo(int numberOfRouteInfo)
+    private static List<TopicPartitionOffsetDto> CreateRandomTopicOffset(int numberOfRouteInfo)
     {
-        var result = new List<KafkaRouteInfo>();
+        var result = new List<TopicPartitionOffsetDto>();
         for (var i = 0; i < numberOfRouteInfo; i++)
         {
-            result.Add(new KafkaRouteInfo(DataSourceName, DataSourceName, i, Rnd.Next(0, 1000), DataSourceName));
+            result.Add(new TopicPartitionOffsetDto(DataSourceName, i, Rnd.Next(0, 1000)));
         }
 
         return result;

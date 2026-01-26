@@ -17,22 +17,28 @@
 
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.Streaming.Abstraction;
-using MA.Streaming.Core.Routing;
 
 namespace MA.Streaming.Core.DataFormatManagement;
 
 public class DataSourcesRepository : IDataSourcesRepository
 {
     private readonly IKafkaTopicHelper kafkaTopicHelper;
+    private readonly IDomainKafkaRouteMappingInfoCreator domainKafkaRouteMappingInfoCreator;
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
 
     private readonly object readWriteLock = new();
     private HashSet<string> trackedTopics = [];
+    private Dictionary<string, string> topicToDataSourceMap = new();
+
     private bool initiated;
 
-    public DataSourcesRepository(IKafkaTopicHelper kafkaTopicHelper, IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
+    public DataSourcesRepository(
+        IKafkaTopicHelper kafkaTopicHelper,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
+        IDomainKafkaRouteMappingInfoCreator domainKafkaRouteMappingInfoCreator)
     {
         this.kafkaTopicHelper = kafkaTopicHelper;
+        this.domainKafkaRouteMappingInfoCreator = domainKafkaRouteMappingInfoCreator;
         this.streamingApiConfiguration = streamingApiConfigurationProvider.Provide();
     }
 
@@ -73,11 +79,10 @@ public class DataSourcesRepository : IDataSourcesRepository
 
         lock (this.readWriteLock)
         {
-            var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicSuffix(
-                this.streamingApiConfiguration.BrokerUrl,
-                Constants.EssentialTopicNameSuffix);
+            var essentialsPrefix = this.domainKafkaRouteMappingInfoCreator.CreateEssentialTopicName("").Topic;
+            var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.streamingApiConfiguration.BrokerUrl, essentialsPrefix);
             this.trackedTopics = essentialTopics
-                .Select(i => i.TopicName.Replace(Constants.EssentialTopicNameSuffix, string.Empty)).Distinct().ToHashSet();
+                .Select(i => i.TopicName.Replace(essentialsPrefix, string.Empty)).Distinct().ToHashSet();
             this.initiated = true;
         }
     }

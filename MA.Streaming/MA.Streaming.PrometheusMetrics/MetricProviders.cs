@@ -84,9 +84,21 @@ public static class MetricProviders
         DataSource,
         StreamLabel);
 
+    public static Counter NumberOfRoutedEssentialDataPackets { get; } = Metrics.CreateCounter(
+        "stream_api_essential_data_packets_routed_total",
+        "Number of essential data packets routed by router",
+        DataSource,
+        StreamLabel);
+
     public static Counter NumberOfRoutedDataPacketsBytes { get; } = Metrics.CreateCounter(
         "stream_api_data_packets_routed_bytes_total",
         "Total bytes of data packets routed by router",
+        DataSource,
+        StreamLabel);
+
+    public static Counter NumberOfRoutedEssentialDataPacketsBytes { get; } = Metrics.CreateCounter(
+        "stream_api_essential_data_packets_routed_bytes_total",
+        "Total bytes of essential data packets routed by router",
         DataSource,
         StreamLabel);
 

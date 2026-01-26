@@ -1,34 +1,48 @@
+
 services:
-  stream_api_integration_test_zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - 12187:2181   
-  
   stream_api_integration_test_kafka:
-    image: confluentinc/cp-kafka:7.9.1
-    depends_on:
-      - stream_api_integration_test_zookeeper
+    image: apache/kafka:latest
+    container_name: stream_api_integration_test_kafka
+    networks: [stream_net]
     ports:
-      - 9097:9097 
-      - 9098:9098 
+      # External listener for host clients
+      - "9098:9098"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: stream_api_integration_test_zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://stream_api_integration_test_kafka:9093,PLAINTEXT_HOST://localhost:9097,PLAINTEXT_UI://192.168.1.168:9098
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_UI:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # KRaft (no ZooKeeper): combined controller+broker single node
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+
+      # Listeners: internal (containers), controller (KRaft), and external (host)
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9098"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://stream_api_integration_test_kafka:9092,EXTERNAL://localhost:9098"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@stream_api_integration_test_kafka:9093"
+
+      # Single-broker friendly defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  
-  stream_api_kafka_ui:   
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      # Persist broker data (optional but recommended)
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"    
+
+  stream_api_kafka_ui:
     image: provectuslabs/kafka-ui:latest
-    ports:
-      - 8080:8080
+    container_name: stream_api_kafka_ui
+    networks: [stream_net]
     depends_on:
-      - stream_api_integration_test_kafka    
+      - stream_api_integration_test_kafka
+    ports:
+      - "8080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 192.168.1.168:9098
-      DYNAMIC_CONFIG_ENABLED: 'true' 
+      # Connect inside the Docker network to the internal listener
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: stream_api_integration_test_kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+
+networks:
+  stream_net:
+    driver: bridge
+

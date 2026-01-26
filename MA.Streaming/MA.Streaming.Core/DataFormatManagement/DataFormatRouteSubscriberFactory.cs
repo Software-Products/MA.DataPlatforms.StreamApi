@@ -28,20 +28,24 @@ namespace MA.Streaming.Core.DataFormatManagement;
 public class DataFormatRouteSubscriberFactory : IDataFormatRouteSubscriberFactory
 {
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
-    private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly ILogger logger;
     private readonly IRouteManager routeManager;
+    private readonly IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository;
+    private readonly IDomainNameProvider domainNameProvider;
 
     public DataFormatRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         ILogger logger,
-        IRouteManager routeManager)
+        IRouteManager routeManager,
+        IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository,
+        IDomainNameProvider domainNameProvider
+    )
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
-        this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.logger = logger;
         this.routeManager = routeManager;
+        this.readingWritingComponentRepository = readingWritingComponentRepository;
+        this.domainNameProvider = domainNameProvider;
     }
 
     public IRouteSubscriber Create(IReadOnlyList<KafkaRoute> routes)
@@ -49,11 +53,13 @@ public class DataFormatRouteSubscriberFactory : IDataFormatRouteSubscriberFactor
         var dataFormatSubscriptionConfigurationProvider = new DataFormatConsumingConfigurationProvider(this.streamingApiConfigurationProvider, routes);
         var kafkaListenerFactory = new KafkaListenerFactory(
             dataFormatSubscriptionConfigurationProvider,
-            this.cancellationTokenSourceProvider,
             this.logger);
         return new KafkaRouteSubscriber(
             kafkaListenerFactory,
             dataFormatSubscriptionConfigurationProvider,
-            this.routeManager);
+            this.routeManager,
+            this.logger,
+            this.readingWritingComponentRepository,
+            $"DataFormat_Route_Subscriber_{this.domainNameProvider.Provide()}_{DateTime.Now.Ticks}");
     }
 }

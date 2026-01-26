@@ -25,31 +25,30 @@ namespace MA.Streaming.Core.Routing.EssentialsRouting;
 public class EssentialRouteConsumingConfigurationProvider : IConsumingConfigurationProvider
 {
     private readonly ConnectionDetailsDto connectionDetailsDto;
-    private readonly IRouteBindingInfoRepository routeBindingInfoRepository;
-    private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration streamApiConfig;
 
     public EssentialRouteConsumingConfigurationProvider(
         ConnectionDetailsDto connectionDetailsDto,
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        IRouteBindingInfoRepository routeBindingInfoRepository,
-        IEssentialTopicNameCreator essentialTopicNameCreator)
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
         this.connectionDetailsDto = connectionDetailsDto;
-        this.routeBindingInfoRepository = routeBindingInfoRepository;
-        this.essentialTopicNameCreator = essentialTopicNameCreator;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.streamApiConfig = streamingApiConfigurationProvider.Provide();
     }
 
     public ConsumingConfiguration Provide()
     {
-        var essentialRoute = this.GetEssentialRoute();
+        var kafkaRouteInfo = this.kafkaRouteInfoCreator.CreateEssentialRouteInfo(this.connectionDetailsDto.DataSource);
+        var essentialRoute = GetEssentialRoute(kafkaRouteInfo);
+        var essentialReaderGroupName = $"Essential_Reader_{Guid.NewGuid()}";
         var kafkaSubscriptionConfigs = new List<KafkaConsumingConfig>
         {
             new(
                 new KafkaListeningConfig(
                     this.streamApiConfig.BrokerUrl,
-                    Guid.NewGuid().ToString(),
+                    essentialReaderGroupName,
                     AutoOffsetResetMode.FromOffset,
                     this.connectionDetailsDto.EssentialsOffset),
                 essentialRoute,
@@ -59,13 +58,12 @@ public class EssentialRouteConsumingConfigurationProvider : IConsumingConfigurat
             kafkaSubscriptionConfigs);
     }
 
-    private KafkaRoute GetEssentialRoute()
+    private static KafkaRoute GetEssentialRoute(KafkaRouteInfo kafkaRouteInfo)
     {
-        var essentialBindingInfo = this.routeBindingInfoRepository.GetOrAdd(this.connectionDetailsDto.DataSource, Constants.EssentialStreamName, true);
         var essentialRoute = new KafkaRoute(
-            essentialBindingInfo.RouteName,
-            this.essentialTopicNameCreator.Create(this.connectionDetailsDto.DataSource),
-            0);
+            kafkaRouteInfo.RouteNameInfo.Name,
+            kafkaRouteInfo.KafkaRouteTopicInfo.Topic,
+            kafkaRouteInfo.KafkaRouteTopicInfo.Partition);
         return essentialRoute;
     }
 }

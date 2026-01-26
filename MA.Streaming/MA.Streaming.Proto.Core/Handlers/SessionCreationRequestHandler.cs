@@ -17,6 +17,7 @@
 
 using Google.Protobuf;
 using Google.Protobuf.Collections;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
@@ -32,21 +33,19 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
     private readonly IKeyGeneratorService keyGeneratorService;
     private readonly IPacketWriterHelper packetWriterHelper;
     private readonly ISessionInfoService sessionInfoService;
-    private readonly IRouteInfoProvider routeInfoProvider;
+    private readonly IKafkaBrokerRoutesOffsetExtractor kafkaBrokerRoutesOffsetExtractor;
     private readonly ITypeNameProvider typeNameProvider;
-
     public SessionCreationRequestHandler(
-        IRouteInfoProvider routeInfoProvider,
+        IKafkaBrokerRoutesOffsetExtractor kafkaBrokerRoutesOffsetExtractor,
         ITypeNameProvider typeNameProvider,
         IKeyGeneratorService keyGeneratorService,
         IPacketWriterHelper packetWriterHelper,
         ISessionInfoService sessionInfoService)
-
     {
         this.keyGeneratorService = keyGeneratorService;
         this.packetWriterHelper = packetWriterHelper;
         this.sessionInfoService = sessionInfoService;
-        this.routeInfoProvider = routeInfoProvider;
+        this.kafkaBrokerRoutesOffsetExtractor = kafkaBrokerRoutesOffsetExtractor;
         this.typeNameProvider = typeNameProvider;
     }
 
@@ -55,21 +54,25 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         SetDefaultType(request);
 
         var sessionKey = this.keyGeneratorService.GenerateStringKey();
-        var partitionOffsetsInfo = this.GetTopicPartitionOffsets(request.DataSource);
+        var partitionOffsetsInfos =   this.kafkaBrokerRoutesOffsetExtractor.Extract(request.DataSource);
 
         var sessionInfoPacket = CreateSessionInfoPacket(request);
-        var newSessionPacket = CreateNewSessionPacket(request, partitionOffsetsInfo.mapfields, sessionInfoPacket);
+        var newSessionPacket = CreateNewSessionPacket(request, partitionOffsetsInfos, sessionInfoPacket);
 
         var newSessionPacketDto = new NewSessionPacketDto(
             request.DataSource,
-            partitionOffsetsInfo.topicPartitionOffsetDtos,
+            partitionOffsetsInfos,
             request.UtcOffset?.ToTimeSpan() ?? TimeSpan.Zero,
             new SessionInfoPacketDto(
                 sessionInfoPacket.Type,
                 sessionInfoPacket.Version,
                 sessionInfoPacket.Identifier,
                 sessionInfoPacket.AssociateSessionKeys,
-                sessionInfoPacket.Details));
+                sessionInfoPacket.Details,
+                newSessionPacket.UtcOffset.ToTimeSpan(),
+                newSessionPacket.CreationTime.ToDateTime(),
+                DateTime.UtcNow),
+            newSessionPacket.CreationTime.ToDateTime());
 
         var res = this.sessionInfoService.AddNewSession(sessionKey, newSessionPacketDto);
 
@@ -123,25 +126,35 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
             {
                 request.Details
             },
-            Identifier = request.Identifier
+            Identifier = request.Identifier,
+            CreationTime = request.CreationTime ?? Timestamp.FromDateTime(DateTime.UtcNow),
+            UtcOffset = request.UtcOffset ?? Duration.FromTimeSpan(TimeSpan.Zero),
+            TerminationTime = Timestamp.FromDateTime(DateTime.UtcNow)
         };
         return sessionInfoPacket;
     }
 
     private static NewSessionPacket CreateNewSessionPacket(
         CreateSessionRequest request,
-        MapField<string, long> topicPartitionOffsets,
+        IEnumerable<TopicPartitionOffsetDto> topicPartitionOffsets,
         SessionInfoPacket sessionInfoPacket)
     {
+        var protoTopicOffsets = new MapField<string, long>();
+        foreach (var topicPartitionOffset in topicPartitionOffsets)
+        {
+            protoTopicOffsets.Add(topicPartitionOffset.Title, topicPartitionOffset.Offset);
+        }
+
         var newSessionPacket = new NewSessionPacket
         {
             DataSource = request.DataSource,
             TopicPartitionOffsets =
             {
-                topicPartitionOffsets
+                protoTopicOffsets
             },
-            UtcOffset = request.UtcOffset,
-            SessionInfo = sessionInfoPacket
+            UtcOffset = sessionInfoPacket.UtcOffset,
+            SessionInfo = sessionInfoPacket,
+            CreationTime = sessionInfoPacket.CreationTime
         };
         return newSessionPacket;
     }
@@ -152,20 +165,5 @@ public class SessionCreationRequestHandler : ISessionCreationRequestHandler
         {
             request.Type = "Session";
         }
-    }
-
-    private (IReadOnlyList<TopicPartitionOffsetDto> topicPartitionOffsetDtos, MapField<string, long> mapfields) GetTopicPartitionOffsets(string dataSource)
-    {
-        var result = new MapField<string, long>();
-        var topicPartitionOffsets = new List<TopicPartitionOffsetDto>();
-
-        var routeInfos = this.routeInfoProvider.GetRouteInfo(dataSource).Cast<KafkaRouteInfo>().ToList();
-        foreach (var routeInfo in routeInfos)
-        {
-            result.Add($"{routeInfo.Topic}:{routeInfo.Partition}", routeInfo.Offset);
-            topicPartitionOffsets.Add(new TopicPartitionOffsetDto(routeInfo.Topic, routeInfo.Partition, routeInfo.Offset));
-        }
-
-        return (topicPartitionOffsets, result);
     }
 }

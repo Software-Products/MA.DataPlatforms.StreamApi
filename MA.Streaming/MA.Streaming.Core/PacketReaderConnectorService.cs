@@ -28,20 +28,23 @@ public class PacketReaderConnectorService : IPacketReaderConnectorService
 {
     private readonly IRouteSubscriber routeSubscriber;
     private readonly ILogger logger;
-    private readonly IRouteBindingInfoRepository bindingInfoRepository;
+    private readonly IRoutingMappingInfoRepository routingMappingInfoRepository;
     private readonly string sessionKey;
+    private readonly KafkaRouteInfo mainRouteInfo;
 
     public PacketReaderConnectorService(
         ConnectionDetailsDto connectionDetailsDto,
         IRouteSubscriber routeSubscriber,
         ILogger logger,
-        IRouteBindingInfoRepository bindingInfoRepository)
+        IRoutingMappingInfoRepository routingMappingInfoRepository,
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
         this.routeSubscriber = routeSubscriber;
         this.logger = logger;
-        this.bindingInfoRepository = bindingInfoRepository;
+        this.routingMappingInfoRepository = routingMappingInfoRepository;
         this.ConnectionId = connectionDetailsDto.Id;
         this.sessionKey = connectionDetailsDto.SessionKey;
+        this.mainRouteInfo = kafkaRouteInfoCreator.CreateMainRouteInfo(connectionDetailsDto.DataSource);
     }
 
     public event EventHandler<PacketReceivedInfoEventArgs>? PacketReceived;
@@ -58,8 +61,10 @@ public class PacketReaderConnectorService : IPacketReaderConnectorService
     {
         try
         {
+            this.logger.Info($"stopping packet reader {this.sessionKey}-{this.ConnectionId}");
             this.routeSubscriber.PacketReceived -= this.Subscriber_PacketReceived;
             this.routeSubscriber.Unsubscribe();
+            this.logger.Info($"packet reader {this.sessionKey}-{this.ConnectionId} stopped");
         }
         catch (Exception ex)
         {
@@ -75,20 +80,39 @@ public class PacketReaderConnectorService : IPacketReaderConnectorService
             return;
         }
 
-        var bindingInfo = this.bindingInfoRepository.GetBindingInfoByRoute(e.Route);
-        if (bindingInfo == null)
+        var routeMappingInfo = this.routingMappingInfoRepository.GetRouteInfo(e.Route);
+
+        if (routeMappingInfo == null)
         {
             this.logger.Error($"binding info for route{e.Route} is not found while listening to the route {e.Route}");
             return;
         }
 
-        MetricProviders.NumberOfReceivedMessagesFromRouter.WithLabels(this.ConnectionId.ToString(), bindingInfo.DataSource, bindingInfo.Stream, e.Key ?? string.Empty)
+        var messageStreamName = (routeMappingInfo.RouteNameInfo.Stream == this.mainRouteInfo.RouteNameInfo.Stream)
+            ? string.Empty
+            : routeMappingInfo.RouteNameInfo.Stream;
+
+        MetricProviders.NumberOfReceivedMessagesFromRouter.WithLabels(
+                this.ConnectionId.ToString(),
+                routeMappingInfo.RouteNameInfo.DataSource,
+                routeMappingInfo.RouteNameInfo.Stream,
+                e.Key ?? string.Empty)
             .Inc();
-        MetricProviders.NumberOfReceivedBytesFromRouter.WithLabels(this.ConnectionId.ToString(), bindingInfo.DataSource, bindingInfo.Stream, e.Key ?? string.Empty)
+        MetricProviders.NumberOfReceivedBytesFromRouter.WithLabels(
+                this.ConnectionId.ToString(),
+                routeMappingInfo.RouteNameInfo.DataSource,
+                routeMappingInfo.RouteNameInfo.Stream,
+                e.Key ?? string.Empty)
             .Inc(e.Message.Length);
 
         this.PacketReceived?.Invoke(
             this,
-            new PacketReceivedInfoEventArgs(this.ConnectionId, bindingInfo.DataSource, bindingInfo.Stream, e.Key ?? string.Empty, e.SubmitTime, e.Message));
+            new PacketReceivedInfoEventArgs(
+                this.ConnectionId,
+                routeMappingInfo.RouteNameInfo.DataSource,
+                messageStreamName,
+                e.Key ?? string.Empty,
+                e.SubmitTime,
+                e.Message));
     }
 }

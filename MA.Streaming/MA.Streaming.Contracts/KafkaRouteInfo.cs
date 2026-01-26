@@ -19,25 +19,14 @@ namespace MA.Streaming.Contracts;
 
 public class KafkaRouteInfo : IRouteInfo
 {
-    public KafkaRouteInfo(string name, string topic, int partition, long offset, string dataSource, string stream = "")
+    public KafkaRouteInfo(RouteNameInfo routeNameInfo, KafkaRouteTopicInfo kafkaRouteTopicInfo)
     {
-        this.Name = name;
-        this.Offset = offset;
-        this.DataSource = dataSource;
-        this.Topic = topic;
-        this.Partition = partition;
-        this.Stream = stream;
+        this.RouteNameInfo = routeNameInfo;
+
+        this.KafkaRouteTopicInfo = kafkaRouteTopicInfo;
     }
 
-    public string Name { get; }
+    public KafkaRouteTopicInfo KafkaRouteTopicInfo { get; }
 
-    public string DataSource { get; }
-
-    public string Stream { get; }
-
-    public string Topic { get; }
-
-    public int Partition { get; }
-
-    public long Offset { get; }
+    public RouteNameInfo RouteNameInfo { get; }
 }

@@ -27,38 +27,38 @@ namespace MA.Streaming.Core.SessionManagement;
 public class SessionRouteSubscriberFactory : ISessionRouteSubscriberFactory
 {
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
-    private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly IRouteManager routeManager;
     private readonly ILogger logger;
+    private readonly IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
 
     public SessionRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IRouteManager routeManager,
-        ILogger logger)
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator,
+        ILogger logger,
+        IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
-        this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.routeManager = routeManager;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.logger = logger;
+        this.readingWritingComponentRepository = readingWritingComponentRepository;
     }
 
-    public IRouteSubscriber Create(string routeName)
-    {
-        return this.CreateRouteSubscriber(routeName);
-    }
-
-    private IRouteSubscriber CreateRouteSubscriber(string routeName)
+    public IRouteSubscriber Create()
     {
         var sessionInfoConsumingConfigurationProvider = new SessionInfoConsumingConfigurationProvider(
-            routeName,
+            this.kafkaRouteInfoCreator,
             this.streamingApiConfigurationProvider);
         return new KafkaRouteSubscriber(
             new KafkaListenerFactory(
                 sessionInfoConsumingConfigurationProvider,
-                this.cancellationTokenSourceProvider,
                 this.logger),
             sessionInfoConsumingConfigurationProvider,
-            this.routeManager);
+            this.routeManager,
+            this.logger,
+            this.readingWritingComponentRepository,
+            "SessionInfo_Route_Reader");
     }
 }

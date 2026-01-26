@@ -22,16 +22,18 @@ public class TopicPartitionOffsetDto
     public readonly string TopicName;
     public readonly int Partition;
     public readonly long Offset;
+    public readonly string Title;
 
     public TopicPartitionOffsetDto(string topicName, int partition, long offset)
     {
         this.TopicName = topicName;
         this.Partition = partition;
         this.Offset = offset;
+        this.Title = $"{this.TopicName}:{this.Partition}";
     }
 
     public override string ToString()
     {
-        return $"{this.TopicName}:{this.Partition}";
+        return this.Title;
     }
 }

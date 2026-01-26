@@ -16,6 +16,7 @@
 // </copyright>
 
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
@@ -68,7 +69,10 @@ public class SessionDetailsUpdateRequestHandler : ISessionDetailsUpdateRequestHa
                 sessionInfo.Version,
                 sessionInfo.Identifier,
                 sessionInfo.AssociateSessionKeys,
-                sessionInfo.Details));
+                sessionInfo.Details,
+                sessionInfo.UtcOffset.ToTimeSpan(),
+                sessionInfo.CreationTime.ToDateTime(),
+                sessionInfo.TerminationTime.ToDateTime()));
 
         if (!res.Success)
         {
@@ -116,7 +120,11 @@ public class SessionDetailsUpdateRequestHandler : ISessionDetailsUpdateRequestHa
             },
             DataSource = foundSessionDetail.DataSource,
             Identifier = foundSessionDetail.SessionInfoPacket.Identifier,
-            Version = foundSessionDetail.SessionInfoPacket.Version
+            Version = foundSessionDetail.SessionInfoPacket.Version,
+            UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset),
+            CreationTime = Timestamp.FromDateTime(foundSessionDetail.SessionCreationTime),
+            TerminationTime = Timestamp.FromDateTime(foundSessionDetail.SessionTerminationTime)
+
         };
         foreach (var foundDetail in foundSessionDetail.SessionInfoPacket.Details)
         {

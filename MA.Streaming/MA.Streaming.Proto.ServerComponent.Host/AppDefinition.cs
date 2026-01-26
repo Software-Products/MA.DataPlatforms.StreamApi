@@ -82,7 +82,7 @@ internal static class AppDefinition
     {
         listenerPortNumber = Environment.GetEnvironmentVariable("LISTENER_PORT_NUMBER") ?? "1531";
         prometheusMetricPort = Environment.GetEnvironmentVariable("PROMETHEUS_METRIC_PORT") ?? "2468";
-        streamApiConfigFilePath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "/Configs/AppConfig.json";
+        streamApiConfigFilePath = Environment.GetEnvironmentVariable("CONFIG_PATH") ?? "Configs/AppConfig.json";
         autoStart = bool.Parse(Environment.GetEnvironmentVariable("AUTO_START") ?? "true");
         isLoaded = true;
     }

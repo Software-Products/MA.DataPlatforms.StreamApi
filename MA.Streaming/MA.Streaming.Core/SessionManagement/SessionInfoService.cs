@@ -23,7 +23,6 @@ using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.Routing.EssentialsRouting;
 using MA.Streaming.PrometheusMetrics;
 
 using Timer = System.Timers.Timer;
@@ -32,14 +31,13 @@ namespace MA.Streaming.Core.SessionManagement;
 
 public class SessionInfoService : ISessionInfoService
 {
-    private const string SessionInfoRouteName = "Session_Info_Route";
     private readonly IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository;
     private readonly ISessionRouteSubscriberFactory sessionRouteSubscriberFactory;
     private readonly ILogger logger;
     private readonly IDtoFromByteFactory<PacketDto> packetDtoFromByteFactory;
     private readonly IDtoFromByteFactory<NewSessionPacketDto> newSessionDtoFromByteFactory;
     private readonly IDtoFromByteFactory<EndOfSessionPacketDto> endOfSessionDtoFromByteFactory;
-    private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IDataSourcesRepository dataSourcesRepository;
     private readonly IDtoFromByteFactory<SessionInfoPacketDto> sessionInfoDtoFromByteFactory;
 
@@ -65,7 +63,7 @@ public class SessionInfoService : ISessionInfoService
         IDtoFromByteFactory<NewSessionPacketDto> newSessionDtoFromByteFactory,
         IDtoFromByteFactory<EndOfSessionPacketDto> endOfSessionDtoFromByteFactory,
         ITypeNameProvider typeNameProvider,
-        IEssentialTopicNameCreator essentialTopicNameCreator,
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator,
         IDataSourcesRepository dataSourcesRepository)
     {
         this.sessionInfoRepository = sessionInfoRepository;
@@ -75,7 +73,7 @@ public class SessionInfoService : ISessionInfoService
         this.sessionInfoDtoFromByteFactory = sessionInfoDtoFromByteFactory;
         this.newSessionDtoFromByteFactory = newSessionDtoFromByteFactory;
         this.endOfSessionDtoFromByteFactory = endOfSessionDtoFromByteFactory;
-        this.essentialTopicNameCreator = essentialTopicNameCreator;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.dataSourcesRepository = dataSourcesRepository;
         this.newSessionPacketTypeName = typeNameProvider.NewSessionPacketTypeName;
         this.endOfSessionPacketTypeName = typeNameProvider.EndOfSessionPacketTypeName;
@@ -101,9 +99,10 @@ public class SessionInfoService : ISessionInfoService
     {
         try
         {
+            var essentialRouteInfo = this.kafkaRouteInfoCreator.CreateEssentialRouteInfo(newSessionPacket.DataSource);
             var mainOffset = newSessionPacket.TopicOffsetsPartitions.FirstOrDefault(i => i.TopicName == newSessionPacket.DataSource && i.Partition == 0)?.Offset ?? 0;
             var essentialOffset = newSessionPacket.TopicOffsetsPartitions
-                .FirstOrDefault(i => i.TopicName == this.essentialTopicNameCreator.Create(newSessionPacket.DataSource) && i.Partition == 0)?.Offset ?? 0;
+                .FirstOrDefault(i => i.TopicName == essentialRouteInfo.KafkaRouteTopicInfo.Topic && i.Partition == 0)?.Offset ?? 0;
 
             var sessionDetailRecord = new SessionDetailRecord(
                 sessionKey,
@@ -112,7 +111,7 @@ public class SessionInfoService : ISessionInfoService
                 mainOffset,
                 essentialOffset,
                 newSessionPacket.OffsetFromUtc,
-                0);
+                newSessionPacket.SessionCreationTime);
             if (newSessionPacket.SessionInfoPacketDto != null)
             {
                 sessionDetailRecord.SetSessionInfo(newSessionPacket.SessionInfoPacketDto);
@@ -134,7 +133,7 @@ public class SessionInfoService : ISessionInfoService
         }
     }
 
-    public (bool Success, string Message) EndSession(string sessionKey, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto)
+    public (bool Success, string Message) EndSession(string sessionKey, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto, DateTime sessionTerminationTime)
     {
         try
         {
@@ -145,7 +144,7 @@ public class SessionInfoService : ISessionInfoService
                 return (false, "the session with that key not found to end");
             }
 
-            this.EndSession(foundItem, partitionOffsetDto);
+            this.EndSession(foundItem, partitionOffsetDto, sessionTerminationTime);
             return (true, "ok");
         }
         catch (Exception ex)
@@ -166,7 +165,7 @@ public class SessionInfoService : ISessionInfoService
             this.started = true;
             try
             {
-                this.sessionRouteSubscriber = this.sessionRouteSubscriberFactory.Create(SessionInfoRouteName);
+                this.sessionRouteSubscriber = this.sessionRouteSubscriberFactory.Create();
                 this.sessionRouteSubscriber.PacketReceived += this.SessionRouteSubscriber_PacketReceived;
                 this.sessionRouteSubscriber.Subscribe();
                 this.lastPacketTimeReceived = DateTime.UtcNow;
@@ -213,13 +212,14 @@ public class SessionInfoService : ISessionInfoService
         }
     }
 
-    private void EndSession(SessionDetailRecord sessionDetailRecord, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto)
+    private void EndSession(SessionDetailRecord sessionDetailRecord, IReadOnlyList<TopicPartitionOffsetDto> partitionOffsetDto, DateTime sessionTerminationTime)
     {
         if (sessionDetailRecord.Completed)
         {
             return;
         }
 
+        sessionDetailRecord.SetSessionTerminationTime(sessionTerminationTime);
         sessionDetailRecord.Complete(partitionOffsetDto);
         this.SessionStopped?.Invoke(
             this,
@@ -233,6 +233,9 @@ public class SessionInfoService : ISessionInfoService
         var sessionInfoIdentifier = !string.IsNullOrEmpty(sessionInfo.Identifier) ? sessionInfo.Identifier : foundItem.SessionInfoPacket.Identifier;
         var sessionInfoAssociatedIds = sessionInfo.AssociatedKeys.Any() ? sessionInfo.AssociatedKeys : foundItem.SessionInfoPacket.AssociatedKeys;
         var sessionInfoDetails = foundItem.SessionInfoPacket.Details.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        var utcOffset = sessionInfo.UtcOffset != TimeSpan.Zero ? sessionInfo.UtcOffset : foundItem.SessionInfoPacket.UtcOffset;
+        var sessionCreationTime = sessionInfo.SessionCreationTime != default ? sessionInfo.SessionCreationTime : foundItem.SessionInfoPacket.SessionCreationTime;
+        var sessionTerminationTime = sessionInfo.SessionTerminationTime != default ? sessionInfo.SessionTerminationTime : foundItem.SessionInfoPacket.SessionTerminationTime;
         foreach (var newDetail in sessionInfo.Details)
         {
             sessionInfoDetails[newDetail.Key] = newDetail.Value;
@@ -243,7 +246,10 @@ public class SessionInfoService : ISessionInfoService
             sessionInfoVersion,
             sessionInfoIdentifier,
             sessionInfoAssociatedIds,
-            sessionInfoDetails);
+            sessionInfoDetails,
+            utcOffset,
+            sessionCreationTime,
+            sessionTerminationTime);
 
         if (foundItem.SessionInfoPacket.Equals(newSessionInfo))
         {
@@ -321,11 +327,6 @@ public class SessionInfoService : ISessionInfoService
 
     private PacketDto? GetPacket(RoutingDataPacket e)
     {
-        if (e.Route != SessionInfoRouteName)
-        {
-            return null;
-        }
-
         var sessionKey = e.Key;
         var packet = this.packetDtoFromByteFactory.ToDto(e.Message);
         if (packet is null ||
@@ -363,7 +364,7 @@ public class SessionInfoService : ISessionInfoService
             return;
         }
 
-        this.EndSession(foundItem, endOfSession.TopicPartitionsOffset);
+        this.EndSession(foundItem, endOfSession.TopicPartitionsOffset, endOfSession.SessionTerminationTime);
     }
 
     private void HandleNewSessionPacketReceived(PacketDto packet, string sessionKey)

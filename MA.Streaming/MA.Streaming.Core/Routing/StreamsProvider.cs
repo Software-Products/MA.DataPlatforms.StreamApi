@@ -26,13 +26,15 @@ namespace MA.Streaming.Core.Routing;
 public class StreamsProvider : IStreamsProvider
 {
     private readonly IKafkaTopicHelper kafkaTopicHelper;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration configuration;
     private List<string> lastStreams;
     private DateTime lastUpdateTime;
 
-    public StreamsProvider(IStreamingApiConfigurationProvider apiConfigurationProvider, IKafkaTopicHelper kafkaTopicHelper)
+    public StreamsProvider(IStreamingApiConfigurationProvider apiConfigurationProvider, IKafkaTopicHelper kafkaTopicHelper, IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
         this.kafkaTopicHelper = kafkaTopicHelper;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.configuration = apiConfigurationProvider.Provide();
         this.lastUpdateTime = DateTime.MinValue;
         this.lastStreams = [];
@@ -48,17 +50,19 @@ public class StreamsProvider : IStreamsProvider
         };
     }
 
-    private IReadOnlyList<string> GetStreamsFromTopic(string dataSource)
+    private List<string> GetStreamsFromTopic(string dataSource)
     {
         if ((DateTime.UtcNow - this.lastUpdateTime).TotalSeconds < 1)
         {
             return this.lastStreams;
         }
 
-        var topicInfos = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.configuration.BrokerUrl, dataSource);
-        var pattern = $@"^{dataSource}\.[^.]*$";
+        var mainDataSourceRouteInfo = this.kafkaRouteInfoCreator.CreateMainRouteInfo(dataSource);
+        var topicInfos = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.configuration.BrokerUrl, mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic);
+        var pattern = $@"^{mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic}\.(.+)$";
         var res = topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).Success)
-            .Select(foundTopicInfo => foundTopicInfo.TopicName.Replace($"{dataSource}.", "")).ToList();
+            .Select(foundTopicInfo => foundTopicInfo.TopicName.Replace($"{mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic}.", ""))
+            .Where(i => !string.IsNullOrWhiteSpace(i)).Distinct().ToList();
         this.lastUpdateTime = DateTime.UtcNow;
         this.lastStreams = res;
         return res;

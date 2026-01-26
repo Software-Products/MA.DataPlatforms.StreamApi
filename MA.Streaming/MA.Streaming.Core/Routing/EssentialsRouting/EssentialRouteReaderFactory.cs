@@ -15,62 +15,57 @@
 // limitations under the License.
 // </copyright>
 
-using System.Collections.Concurrent;
-
 using MA.Common.Abstractions;
-using MA.DataPlatforms.Secu4.RouteReaderComponent;
-using MA.DataPlatforms.Secu4.RouteReaderComponent.Abstractions;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core.Abstractions;
 
 namespace MA.Streaming.Core.Routing.EssentialsRouting;
 
 public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
 {
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
-    private readonly IRouteBindingInfoRepository routeBindingInfoRepository;
-    private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
-    private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IRouteManager routeManager;
+    private readonly IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> routeReadingWritingComponentRepository;
     private readonly ILogger logger;
-    private readonly ConcurrentDictionary<long, IRouteReader> readers = new();
-
     public EssentialRouteReaderFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        IRouteBindingInfoRepository routeBindingInfoRepository,
-        IEssentialTopicNameCreator essentialTopicNameCreator,
-        ICancellationTokenSourceProvider cancellationTokenSourceProvider,
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator,
         IRouteManager routeManager,
+        IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> routeReadingWritingComponentRepository,
         ILogger logger)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
-        this.routeBindingInfoRepository = routeBindingInfoRepository;
-        this.essentialTopicNameCreator = essentialTopicNameCreator;
-        this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.routeManager = routeManager;
+        this.routeReadingWritingComponentRepository = routeReadingWritingComponentRepository;
         this.logger = logger;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
     }
 
-    public IRouteReader Create(ConnectionDetailsDto connectionDetailsDto)
+    public IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto)
     {
-        return this.readers.GetOrAdd(connectionDetailsDto.Id, _ => this.CreateRouteReader(connectionDetailsDto));
+        return this.CreateRouteReader(connectionDetailsDto);
     }
 
-    private IRouteReader CreateRouteReader(ConnectionDetailsDto connectionDetailsDto)
+    private KafkaRouteSubscriber CreateRouteReader(ConnectionDetailsDto connectionDetailsDto)
     {
         var basedSubscriptionConfigurationProvider =
             new EssentialRouteConsumingConfigurationProvider(
                 connectionDetailsDto,
                 this.streamingApiConfigurationProvider,
-                this.routeBindingInfoRepository,
-                this.essentialTopicNameCreator);
-        return new KafkaRouteReader(
-            new KafkaReaderFactory(
+                this.kafkaRouteInfoCreator);
+        return new KafkaRouteSubscriber(
+            new KafkaListenerFactory(
                 basedSubscriptionConfigurationProvider,
-                this.cancellationTokenSourceProvider,
                 this.logger),
             basedSubscriptionConfigurationProvider,
-            this.routeManager);
+            this.routeManager,
+            this.logger,
+            this.routeReadingWritingComponentRepository,
+            $"Essential_Reader_Subscriber_{connectionDetailsDto.Id}");
     }
 }

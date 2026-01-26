@@ -23,7 +23,6 @@ using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.Core.Handlers;
 using MA.Streaming.Proto.Core.Mapper;
@@ -37,6 +36,8 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
     private readonly IActiveConnectionManager activeConnectionManager;
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
+    private readonly IRoutingMappingInfoRepository routingMappingInfoRepository;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration config;
 
     public StreamWriterHandlerFactory(
@@ -45,13 +46,17 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
         IActiveConnectionManager activeConnectionManager,
         IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper,
         ILogger logger,
-        IStreamingApiConfigurationProvider apiConfigurationProvider)
+        IStreamingApiConfigurationProvider apiConfigurationProvider,
+        IRoutingMappingInfoRepository routingMappingInfoRepository,
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
         this.handlerRepository = handlerRepository;
         this.routeSubscriberFactory = routeSubscriberFactory;
         this.activeConnectionManager = activeConnectionManager;
         this.connectionDtoMapper = connectionDtoMapper;
         this.logger = logger;
+        this.routingMappingInfoRepository = routingMappingInfoRepository;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.config = apiConfigurationProvider.Provide();
     }
 
@@ -75,12 +80,13 @@ public class StreamWriterHandlerFactory : IStreamWriterHandlerFactory
             }
 
             var connectionDetailsDto = this.connectionDtoMapper.Map(new ConnectionInfo(connectionId, connectionDetails));
-            var routeBindingInfoRepository = new RouteBindingInfoRepository();
             var connectorService = new PacketReaderConnectorService(
                 connectionDetailsDto,
-                this.routeSubscriberFactory.Create(connectionDetailsDto, routeBindingInfoRepository),
+                this.routeSubscriberFactory.Create(connectionDetailsDto),
                 this.logger,
-                routeBindingInfoRepository);
+                this.routingMappingInfoRepository,
+                this.kafkaRouteInfoCreator);
+
             handler = new ReadPacketResponseStreamWriterHandler(
                 connectionDetailsDto,
                 serverStreamWriter,

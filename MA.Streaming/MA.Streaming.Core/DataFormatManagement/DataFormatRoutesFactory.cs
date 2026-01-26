@@ -16,22 +16,27 @@
 // </copyright>
 
 using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.Routing.EssentialsRouting;
 
 namespace MA.Streaming.Core.DataFormatManagement;
 
 public class DataFormatRoutesFactory : IDataFormatRoutesFactory
 {
-    private readonly IEssentialTopicNameCreator essentialTopicNameCreator;
+    private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
 
-    public DataFormatRoutesFactory(IEssentialTopicNameCreator essentialTopicNameCreator)
+    public DataFormatRoutesFactory(IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
-        this.essentialTopicNameCreator = essentialTopicNameCreator;
+        this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
     }
 
     public IReadOnlyList<KafkaRoute> Create(IReadOnlyList<string> dataSources)
     {
-        return dataSources.Select(i => new KafkaRoute(i, this.essentialTopicNameCreator.Create(i))).ToList();
+        return dataSources
+            .Select(dataSource => this.kafkaRouteInfoCreator.CreateEssentialRouteInfo(dataSource))
+            .Select(kafkaRouteInfo => new KafkaRoute(
+                kafkaRouteInfo.RouteNameInfo.Name,
+                kafkaRouteInfo.KafkaRouteTopicInfo.Topic,
+                kafkaRouteInfo.KafkaRouteTopicInfo.Partition)).ToList();
     }
 }

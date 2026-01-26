@@ -42,7 +42,8 @@ public class EndOfSessionPacketDtoFromByteFactory : IDtoFromByteFactory<EndOfSes
                 {
                     var parseInfo = ParseTopicPartition(i.Key);
                     return new TopicPartitionOffsetDto(parseInfo.Key, parseInfo.Value, i.Value);
-                }).ToList());
+                }).ToList(),
+                endOfSessionPacket.TerminationTime?.ToDateTime() ?? DateTime.UtcNow);
         }
         catch (Exception ex)
         {

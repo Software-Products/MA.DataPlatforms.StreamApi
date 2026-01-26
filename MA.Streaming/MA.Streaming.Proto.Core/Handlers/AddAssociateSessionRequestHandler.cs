@@ -16,6 +16,7 @@
 // </copyright>
 
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
@@ -66,7 +67,10 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
                 sessionInfo.Version,
                 sessionInfo.Identifier,
                 sessionInfo.AssociateSessionKeys,
-                sessionInfo.Details));
+                sessionInfo.Details,
+                foundSessionDetail.UtcOffset, 
+                foundSessionDetail.SessionCreationTime,
+                foundSessionDetail.SessionTerminationTime));
 
         if (!res.Success)
         {
@@ -123,7 +127,10 @@ public class AddAssociateSessionRequestHandler : IAddAssociateSessionRequestHand
             Details =
             {
                 foundSessionDetail.SessionInfoPacket.Details.ToDictionary(i => i.Key, i => i.Value)
-            }
+            },
+            CreationTime = Timestamp.FromDateTime(foundSessionDetail.SessionCreationTime),
+            UtcOffset = Duration.FromTimeSpan(foundSessionDetail.UtcOffset),
+            TerminationTime = Timestamp.FromDateTime(foundSessionDetail.SessionTerminationTime)
         };
         return sessionInfo;
     }

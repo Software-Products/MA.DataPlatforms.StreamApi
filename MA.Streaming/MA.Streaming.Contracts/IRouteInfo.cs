@@ -19,5 +19,7 @@ namespace MA.Streaming.Contracts;
 
 public interface IRouteInfo
 {
-    public string Name { get; }
+    RouteNameInfo RouteNameInfo { get; }
+
+   
 }

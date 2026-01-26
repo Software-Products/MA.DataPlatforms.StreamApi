@@ -27,48 +27,86 @@ namespace MA.Streaming.Core;
 
 public class PacketWriterConnectorService : IPacketWriterConnectorService, IBufferConsumer<WriteDataPacketRequestDto>, IBufferConsumer<WriteInfoPacketRequestDto>
 {
-    private readonly IDataSourcesRepository dataSourcesRepository;
     private readonly IRouterProvider routerProvider;
-    private readonly IRouteNameExtractor routeNameExtractor;
     private readonly ILogger apiLogger;
     private readonly GenericBuffer<WriteDataPacketRequestDto> dataBuffer;
     private readonly GenericBuffer<WriteInfoPacketRequestDto> infoBuffer;
+    private readonly IDataSourceRoutingInfoTracker dataSourceRoutingInfoTracker;
+    private readonly ISessionStreamRoutingPacketTracker sessionStreamRoutingTracker;
+    private readonly ISessionPacketWritingLogProvider sessionPacketWritingLogProvider;
+    private readonly IStreamStopPacketWriterTracker streamStopPacketWriterTracker;
+    private readonly string streamStoppedType;
 
     public PacketWriterConnectorService(
-        IDataSourcesRepository dataSourcesRepository,
         IRouterProvider routerProvider,
-        IRouteNameExtractor routeNameExtractor,
+        IDataSourceRoutingInfoTracker dataSourceRoutingInfoTracker,
+        ISessionStreamRoutingPacketTracker sessionStreamRoutingTracker,
+        ISessionPacketWritingLogProvider sessionPacketWritingLogProvider,
+        ITypeNameProvider typeNameProvider,
+        IStreamStopPacketWriterTracker streamStopPacketWriterTracker,
         ILogger apiLogger)
     {
-        this.dataSourcesRepository = dataSourcesRepository;
         this.routerProvider = routerProvider;
-        this.routeNameExtractor = routeNameExtractor;
+        this.dataSourceRoutingInfoTracker = dataSourceRoutingInfoTracker;
+        this.sessionStreamRoutingTracker = sessionStreamRoutingTracker;
+        this.sessionPacketWritingLogProvider = sessionPacketWritingLogProvider;
+        this.streamStopPacketWriterTracker = streamStopPacketWriterTracker;
         this.dataBuffer = new GenericBuffer<WriteDataPacketRequestDto>(this, new CancellationTokenSourceProvider());
         this.infoBuffer = new GenericBuffer<WriteInfoPacketRequestDto>(this, new CancellationTokenSourceProvider());
         this.apiLogger = apiLogger;
+        this.streamStoppedType = typeNameProvider.StreamStoppedPacketTypeName;
     }
 
     public async Task ConsumeAsync(WriteDataPacketRequestDto data)
     {
         try
         {
-            this.dataSourcesRepository.Add(data.DataSource);
-            var stream = data.Stream;
-
-            if (data.Message.IsEssential)
+            var result = this.sessionStreamRoutingTracker.Monitor(data);
+            if (result.Status is MonitorResultStatus.InvalidPacket)
             {
-                this.SendToEssentialsToDefaultEssentialRoute(data);
+                this.apiLogger.Info($"not writing the packet: {result.Message}");
+                return;
             }
 
-            var router = this.routerProvider.Provide(data.DataSource, stream);
+            var sessionWritingLog = this.sessionPacketWritingLogProvider.Provide(data.DataSource, data.SessionKey);
+            var kafkaRouteInfo = this.dataSourceRoutingInfoTracker.GetDataRouteInfo(data.DataSource, data.Stream);
+            var stream = kafkaRouteInfo.RouteNameInfo.Stream;
+
+            if (data.Message.Type == this.streamStoppedType)
+            {
+                var processResult = this.streamStopPacketWriterTracker.Track(data, stream);
+                if (!processResult.ShouldWriteData)
+                {
+                    return;
+                }
+
+                if (processResult.DataPacketRequestDto != null)
+                {
+                    data = processResult.DataPacketRequestDto;
+                }
+
+                if (processResult.EssentialDataPacketRequestDto != null)
+                {
+                    this.SendEssentialData(processResult.EssentialDataPacketRequestDto, sessionWritingLog);
+                }
+            }
+            else if (data.Message.IsEssential)
+            {
+                this.SendEssentialData(data, sessionWritingLog);
+            }
+
+            var router = this.routerProvider.ProvideDataStreamRouter(data.DataSource, stream);
+            var timeSent = DateTime.UtcNow;
             router.Route(
                 new RoutingDataPacket(
                     data.PacketBytes,
-                    this.routeNameExtractor.Extract(data.DataSource, stream),
-                    DateTime.UtcNow,
+                    kafkaRouteInfo.RouteNameInfo.Name,
+                    timeSent,
                     data.SessionKey));
+
             MetricProviders.NumberOfRoutedDataPackets.WithLabels(data.DataSource, stream).Inc();
             MetricProviders.NumberOfRoutedDataPacketsBytes.WithLabels(data.DataSource, stream).Inc(data.PacketBytes.Length);
+            sessionWritingLog.Log(stream, data.Message.Type, timeSent);
         }
         catch (Exception ex)
         {
@@ -84,12 +122,14 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService, IBuff
     {
         try
         {
-            this.dataSourcesRepository.Add(data.DataSource);
-            var router = this.routerProvider.Provide(data.DataSource);
+            var router = this.routerProvider.ProvideSessionInfoRouter();
+
+            var sessionInfoRouteInfo = this.dataSourceRoutingInfoTracker.GetSessionInfoRouteInfo(data.DataSource);
+
             router.Route(
                 new RoutingDataPacket(
                     data.PacketBytes,
-                    this.routeNameExtractor.Extract(Constants.SessionInfoDataSourceName),
+                    sessionInfoRouteInfo.RouteNameInfo.Name,
                     DateTime.UtcNow,
                     data.Message.SessionKey));
             MetricProviders.NumberOfRoutedInfoPackets.WithLabels(data.DataSource).Inc();
@@ -115,15 +155,19 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService, IBuff
         this.infoBuffer.AddData(request);
     }
 
-    private void SendToEssentialsToDefaultEssentialRoute(WriteDataPacketRequestDto request)
+    private void SendEssentialData(WriteDataPacketRequestDto request, ISessionPacketWritingLog sessionWritingLog)
     {
-        var router = this.routerProvider.Provide(request.DataSource, Constants.EssentialStreamName);
-        var extract = this.routeNameExtractor.Extract(request.DataSource, Constants.EssentialStreamName);
+        var router = this.routerProvider.ProvideEssentialRouter(request.DataSource);
+        var essentialRouteInfo = this.dataSourceRoutingInfoTracker.GetEssentialRouteInfo(request.DataSource);
+        var timeSent = DateTime.UtcNow;
         router.Route(
             new RoutingDataPacket(
                 request.PacketBytes,
-                extract,
-                DateTime.UtcNow,
+                essentialRouteInfo.RouteNameInfo.Name,
+                timeSent,
                 request.SessionKey));
+        MetricProviders.NumberOfRoutedEssentialDataPackets.WithLabels(request.DataSource, essentialRouteInfo.RouteNameInfo.Stream).Inc();
+        MetricProviders.NumberOfRoutedEssentialDataPacketsBytes.WithLabels(request.DataSource, essentialRouteInfo.RouteNameInfo.Stream).Inc(request.PacketBytes.Length);
+        sessionWritingLog.Log(essentialRouteInfo.RouteNameInfo.Stream, request.Message.Type, timeSent);
     }
 }

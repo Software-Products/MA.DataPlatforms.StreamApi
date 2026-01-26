@@ -39,36 +39,61 @@ using Xunit;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class TopicBasedSessionManagerShould
 {
-    private const string BrokerUrl = "localhost:9097";
-    private const string DataSource = "Session_Manager_Test_DataSource";
-    private const string Stream1 = "stream1";
-    internal const string Stream2 = "stream2";
+    private const string BrokerUrl = "localhost:9098";
+    private const string DataSource = "TBSMSDataSource";
+    private const string Domain = "TBSMSDomain";
+    private const string Stream1 = "Stream1";
+    internal const string Stream2 = "Stream2";
     private const string PreExistSessionKey = "0f8fad5b-d9cb-469f-a165-70867728950e";
     private readonly SessionManagementService.SessionManagementServiceClient sessionManagementClient;
+    private readonly string streamTopic1;
+    private readonly string streamTopic2;
+    private readonly string essentialTopic;
+    private readonly string mainStreamTopic;
 
-    public TopicBasedSessionManagerShould(KafkaTestsCleanUpFixture _)
+    public TopicBasedSessionManagerShould()
     {
-        new KafkaClearHelper(BrokerUrl).Clear().Wait();
-        StreamingApiClient.Shutdown();
+        var apiConfigurationProvider =
+            new StreamingApiConfigurationProvider(
+                new StreamingApiConfiguration(
+                    StreamCreationStrategy.TopicBased,
+                    BrokerUrl,
+                    [],
+                    integrateDataFormatManagement: false,
+                    integrateSessionManagement: true,
+                    domain: Domain,
+                    streamApiPort: ApiPortCreator.CreateNew()));
 
-        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(Constants.SessionInfoTopicName, 1));
-        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData($"{DataSource}.{Stream1}", 1));
-        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData($"{DataSource}.{Stream2}", 1));
+        var routingMappingInfoRepository = new RoutingMappingInfoRepository();
+
+        var domainNameProvider = new DomainNameProvider(Domain);
+        var domainKafkaRouteMappingInfoCreator = new DomainKafkaRouteMappingInfoCreator(domainNameProvider, apiConfigurationProvider);
+        var kafkaRouteInfoCreator = new KafkaRouteInfoCreator(domainKafkaRouteMappingInfoCreator, apiConfigurationProvider, routingMappingInfoRepository);
+        var sessionInfoTopic = kafkaRouteInfoCreator.CreateSessionInfoRouteInfo().KafkaRouteTopicInfo.Topic;
+
+        this.streamTopic1 = kafkaRouteInfoCreator.CreateStreamRouteInfo(DataSource, Stream1).KafkaRouteTopicInfo.Topic;
+        this.streamTopic2 = kafkaRouteInfoCreator.CreateStreamRouteInfo(DataSource, Stream2).KafkaRouteTopicInfo.Topic;
+        this.essentialTopic = kafkaRouteInfoCreator.CreateEssentialRouteInfo(DataSource).KafkaRouteTopicInfo.Topic;
+        this.mainStreamTopic = kafkaRouteInfoCreator.CreateMainRouteInfo(DataSource).KafkaRouteTopicInfo.Topic;
+
+        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(sessionInfoTopic, 1));
+        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(this.streamTopic1, 1));
+        new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(this.streamTopic2, 1));
         var typeNameProvider1 = new TypeNameProvider();
 
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var mapField = new MapField<string, long>
         {
             {
-                $"{DataSource}:{0}", 10
+                $"{this.mainStreamTopic}:{0}", 10
             },
             {
-                $"{DataSource}.{Stream1}:{0}", 5
+                $"{this.streamTopic1}:{0}", 5
             },
             {
-                $"{DataSource}.{Stream2}:{0}", 20
+                $"{this.streamTopic2}:{0}", 20
             }
         };
         var newSessionPacket = new NewSessionPacket
@@ -122,50 +147,43 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
         };
 
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, typeNameProvider1.NewSessionPacketTypeName, newSessionPacket.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, sessionInfoPacketName, newSessionInfoPacket.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, sessionInfoPacketName, updateSessionIdentifierPacket.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, sessionInfoPacketName, addAssociateSessionPacket1.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, sessionInfoPacketName, addAssociateSessionPacket2.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, sessionInfoPacketName, addAssociateSessionPacket2.ToByteString()),
             PreExistSessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            sessionInfoTopic,
             GetPacketBytes(PreExistSessionKey, typeNameProvider1.EndOfSessionPacketTypeName, endSessionPacket.ToByteString()),
             PreExistSessionKey);
-        Task.Delay(5000).Wait();
-        var apiConfigurationProvider =
-            new StreamingApiConfigurationProvider(
-                new StreamingApiConfiguration(
-                    StreamCreationStrategy.TopicBased,
-                    BrokerUrl,
-                    [],
-                    integrateDataFormatManagement: false,
-                    integrateSessionManagement: true));
-
-        StreamingApiClient.Initialise(
+        new AutoResetEvent(false).WaitOne(5000);
+        var streamApiClient = StreamingApiClientFactory.Create(
             apiConfigurationProvider.Provide(),
             new CancellationTokenSourceProvider(),
             new KafkaBrokerAvailabilityChecker(),
             new LoggingDirectoryProvider(""));
-        this.sessionManagementClient = StreamingApiClient.GetSessionManagementClient();
-        new AutoResetEvent(false).WaitOne(5000);
+
+        streamApiClient.Initialise();
+
+        this.sessionManagementClient = streamApiClient.GetSessionManagementClient();
     }
 
     [Fact]
@@ -210,12 +228,14 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
                 }
             },
             cancellationToken);
+        var creationTime = Timestamp.FromDateTime(new DateTime(new DateOnly(2024, 6, 1), new TimeOnly(0, 0, 0), DateTimeKind.Utc));
         var createSessionRequest = new CreateSessionRequest
         {
             DataSource = DataSource,
             Type = "Session",
             Version = 20,
-            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
+            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2)),
+            CreationTime = creationTime
         };
 
         //act
@@ -223,10 +243,9 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
             createSessionRequest);
 
         //assert
-        new AutoResetEvent(false).WaitOne(2000);
         createSessionResponse.NewSession.DataSource.Should().Be(DataSource);
         createSessionResponse.NewSession.TopicPartitionOffsets.Count.Should().Be(4);
-        IEnumerable<string> expectation = [$"{DataSource}:{0}", $"{DataSource}_essential:{0}", $"{DataSource}.{Stream1}:{0}", $"{DataSource}.{Stream2}:{0}"];
+        IEnumerable<string> expectation = [$"{this.mainStreamTopic}:{0}", $"{this.essentialTopic}:{0}", $"{this.streamTopic1}:{0}", $"{this.streamTopic2}:{0}"];
         createSessionResponse.NewSession.TopicPartitionOffsets.Keys.OrderBy(i => i).Should().BeEquivalentTo(expectation);
         createSessionResponse.NewSession.TopicPartitionOffsets.Values.Should().BeEquivalentTo([0, 0, 0, 0]);
         var createdSessionKey = createSessionResponse.SessionKey;
@@ -280,6 +299,8 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("");
         getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
+        getSessionInfoResponse2.CreationTime.Should().Be(creationTime);
+        getSessionInfoResponse2.TerminationTime.Should().BeNull();
 
         ////////////////////////////////////////Updating The Session Identifiers///////////////////////////////////////////////////////////////////////
 
@@ -333,9 +354,11 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
         ////////////////////////////////////////Ending Of the Session///////////////////////////////////////////////////////////////////////
 
         //arrange
+        var terminationTime = Timestamp.FromDateTime(new DateTime(new DateOnly(2024, 6, 1), new TimeOnly(1, 0, 0), DateTimeKind.Utc));
         var endSessionRequest = new EndSessionRequest
         {
-            SessionKey = createdSessionKey
+            SessionKey = createdSessionKey,
+            TerminationTime = terminationTime
         };
         var sessionStopNotification = this.sessionManagementClient.GetSessionStopNotification(
             new GetSessionStopNotificationRequest
@@ -373,6 +396,64 @@ public class TopicBasedSessionManagerShould : IClassFixture<KafkaTestsCleanUpFix
         getSessionInfoResponse2.DataSource.Should().Be(DataSource);
         getSessionInfoResponse2.Identifier.Should().Be("test_identifier");
         getSessionInfoResponse2.UtcOffset.Should().Be(Duration.FromTimeSpan(TimeSpan.FromHours(-2)));
+        getSessionInfoResponse2.TerminationTime.Should().Be(terminationTime);
+        getSessionInfoResponse2.CreationTime.Should().Be(creationTime);
+    }
+
+    [Fact]
+    public void Create_And_End_Session_Without_Setting_Creation_And_Termination_Time()
+    {
+        ////////////////////////////////////Creation of a Session////////////////////////////////////////////////////////////////////////
+        // Arrange
+        var createSessionRequest = new CreateSessionRequest
+        {
+            DataSource = DataSource,
+            Type = "Session",
+            Version = 20,
+            UtcOffset = Duration.FromTimeSpan(TimeSpan.FromHours(-2))
+        };
+
+        //act
+        var createSessionResponse = this.sessionManagementClient.CreateSession(createSessionRequest);
+        //assert
+        createSessionResponse.Success.Should().BeTrue();
+        createSessionResponse.NewSession.DataSource.Should().Be(DataSource);
+        createSessionResponse.NewSession.TopicPartitionOffsets.Count.Should().Be(4);
+        IEnumerable<string> expectation = [$"{this.mainStreamTopic}:{0}", $"{this.essentialTopic}:{0}", $"{this.streamTopic1}:{0}", $"{this.streamTopic2}:{0}"];
+        createSessionResponse.NewSession.TopicPartitionOffsets.Keys.Should().BeEquivalentTo(expectation);
+        createSessionResponse.NewSession.TopicPartitionOffsets.Values.Should().BeEquivalentTo([0, 0, 0, 0]);
+        var createdSessionKey = createSessionResponse.SessionKey;
+        Guid.Parse(createdSessionKey).Should().NotBeEmpty();
+
+        ////////////////////////////////////////Get Session Info///////////////////////////////////////////////////////////////////////
+        // Arrange
+        var getSessionInfoRequest = new GetSessionInfoRequest
+        {
+            SessionKey = createdSessionKey
+        };
+
+        // Act
+        var getSessionInfoResponse = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest);
+
+        // Assert
+        getSessionInfoResponse.CreationTime.ToDateTime().Date.Should().Be(DateTime.UtcNow.Date);
+        getSessionInfoResponse.TerminationTime.Should().BeNull();
+
+        ////////////////////////////////////////Ending Of the Session///////////////////////////////////////////////////////////////////////
+        // Arrange
+        var endSessionRequest = new EndSessionRequest
+        {
+            SessionKey = createdSessionKey
+        };
+
+        // Act
+        var endSessionResponse = this.sessionManagementClient.EndSession(endSessionRequest);
+        getSessionInfoResponse = this.sessionManagementClient.GetSessionInfo(getSessionInfoRequest);
+
+        // Assert
+        endSessionResponse.Success.Should().BeTrue();
+        getSessionInfoResponse.TerminationTime.ToDateTime().Date.Should().Be(DateTime.UtcNow.Date);
+        getSessionInfoResponse.CreationTime.ToDateTime().Date.Should().Be(DateTime.UtcNow.Date);
     }
 
     private static byte[] GetPacketBytes(string sessionKey, string packetType, ByteString content)

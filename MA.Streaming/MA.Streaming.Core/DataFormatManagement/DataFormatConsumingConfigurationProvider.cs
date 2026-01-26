@@ -39,7 +39,7 @@ public class DataFormatConsumingConfigurationProvider : IConsumingConfigurationP
         var subscriptionConfiguration = this.routes.Select(i => new KafkaConsumingConfig(
             new KafkaListeningConfig(
                 this.StreamApiConfig.BrokerUrl,
-                Guid.NewGuid().ToString(),
+                $"Data_Format_Consuming_{Guid.NewGuid()}",
                 AutoOffsetResetMode.Earliest,
                 0),
             i,

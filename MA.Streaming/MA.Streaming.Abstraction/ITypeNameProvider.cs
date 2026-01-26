@@ -26,4 +26,8 @@ public interface ITypeNameProvider
     string SessionInfoPacketTypeName { get; }
 
     string DataFormatDefinitionPacketTypeName { get; }
+
+    string StreamStartedPacketTypeName { get; }
+
+    string StreamStoppedPacketTypeName { get; }
 }

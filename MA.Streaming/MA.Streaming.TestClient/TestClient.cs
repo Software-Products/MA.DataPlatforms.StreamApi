@@ -15,21 +15,43 @@
 // limitations under the License.
 // </copyright>
 
-using System.ComponentModel;
+using MA.Streaming.Abstraction;
+using MA.Streaming.Core;
+using MA.Streaming.Core.Configs;
+using MA.Streaming.Core.Routing;
+using MA.Streaming.Proto.Client.Local;
+using MA.Streaming.Proto.ServerComponent;
+using Microsoft.Extensions.Configuration;
+using Serilog;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
-using MA.Streaming.Abstraction;
-using MA.Streaming.Core.Configs;
-
 namespace MA.Streaming.TestClient;
 
+[ExcludeFromCodeCoverage]
 internal static class TestClient
 {
     private static async Task Main(string[] args)
     {
         var port = IsPortAvailable(13579) ? 13579 : FindFreePortAfter(13579);
-        var configuration = new StreamingApiConfiguration(StreamCreationStrategy.TopicBased, "localhost:9094", [], port);
+
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("Configs/AppConfig.json", optional: false, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .Build();
+        var serilogLogger = new LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", "StreamAPI")
+            .CreateLogger();
+
+        Log.Logger = serilogLogger;
+
+        var logger = new SerilogLoggerAdapter(serilogLogger);
+
+        var streamingApiConfiguration = new StreamingApiConfiguration(StreamCreationStrategy.TopicBased, "localhost:9094", [], port);
         var cancellationTokenSource = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) =>
         {
@@ -38,12 +60,20 @@ internal static class TestClient
             cancellationTokenSource.Dispose();
         };
 
+        var streamApi = StreamingApiClientFactory.Create(
+            streamingApiConfiguration,
+            new CancellationTokenSourceProvider(),
+            new KafkaBrokerAvailabilityChecker(),
+            new LoggingDirectoryProvider(@"C:\Temp"),
+            logger);
+        await streamApi.InitialiseAsync();
+
         var tasks = new List<Task>();
-        var producer = new TelemetryProducer(configuration, "vehicle-001");
+        var producer = new TelemetryProducer(streamApi, "vehicle-001");
 
         tasks.Add(producer.StartCollecting(cancellationTokenSource.Token));
 
-        var processor = new TelemetryProcessor(configuration, producer.DataSource, producer.SessionKey);
+        var processor = new TelemetryProcessor(streamApi, producer.DataSource, producer.SessionKey);
         tasks.Add(processor.StartProcessing(cancellationTokenSource.Token));
 
         Console.WriteLine("Telemetry application started. Press Ctrl+C to stop.");
@@ -56,7 +86,6 @@ internal static class TestClient
         {
             Console.WriteLine("Application stopped.");
         }
-        
     }
 
     private static int FindFreePortAfter(int startPort, int maxPort = 65535)

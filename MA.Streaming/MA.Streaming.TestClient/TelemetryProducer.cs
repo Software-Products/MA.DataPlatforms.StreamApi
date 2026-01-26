@@ -19,15 +19,13 @@ using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 
 using MA.Streaming.API;
-using MA.Streaming.Core;
-using MA.Streaming.Core.Configs;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Local;
-using MA.Streaming.Proto.ServerComponent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace MA.Streaming.TestClient;
 
+[ExcludeFromCodeCoverage]
 public class TelemetryProducer
 {
     private readonly PacketWriterService.PacketWriterServiceClient packetWriter;
@@ -56,7 +54,10 @@ public class TelemetryProducer
                 FormatString = "%5.0f",
                 MinValue = 0.0,
                 MaxValue = 12000.0,
-                Groups = { EngineGroup },
+                Groups =
+                {
+                    EngineGroup
+                },
                 Frequencies =
                 {
                     10.0
@@ -72,7 +73,10 @@ public class TelemetryProducer
                 Units = "°C",
                 DataType = DataType.Float64,
                 FormatString = DefaultFormatString,
-                Groups = { EngineGroup },
+                Groups =
+                {
+                    EngineGroup
+                },
                 MinValue = -40.0,
                 MaxValue = 150.0,
                 Frequencies =
@@ -89,7 +93,10 @@ public class TelemetryProducer
                 Units = "bar",
                 DataType = DataType.Float64,
                 FormatString = DefaultFormatString,
-                Groups = { EngineGroup },
+                Groups =
+                {
+                    EngineGroup
+                },
                 MinValue = 0.0,
                 MaxValue = 10.0,
                 Frequencies =
@@ -109,7 +116,10 @@ public class TelemetryProducer
                 FormatString = DefaultFormatString,
                 MinValue = 0.0,
                 MaxValue = 800.0,
-                Groups = { BrakesGroup },
+                Groups =
+                {
+                    BrakesGroup
+                },
                 WarningMaxValue = 700.0,
                 Frequencies =
                 {
@@ -126,7 +136,10 @@ public class TelemetryProducer
                 Units = "degrees",
                 DataType = DataType.Float64,
                 FormatString = "%5.6f",
-                Groups = { PositionGroup },
+                Groups =
+                {
+                    PositionGroup
+                },
                 MinValue = -90.0,
                 MaxValue = 90.0,
                 IncludesRowData = true
@@ -140,7 +153,10 @@ public class TelemetryProducer
                 Units = "degrees",
                 DataType = DataType.Float64,
                 FormatString = "%5.6f",
-                Groups = { PositionGroup },
+                Groups =
+                {
+                    PositionGroup
+                },
                 MinValue = -180.0,
                 MaxValue = 180.0,
                 IncludesRowData = true
@@ -156,7 +172,10 @@ public class TelemetryProducer
                 FormatString = DefaultFormatString,
                 MinValue = 0.0,
                 MaxValue = 400.0,
-                Groups = { PositionGroup },
+                Groups =
+                {
+                    PositionGroup
+                },
                 IncludesRowData = true
             }
         },
@@ -169,7 +188,10 @@ public class TelemetryProducer
                 ApplicationName = AppName,
                 Description = "Engine temperature exceeds safe operating limits",
                 Priority = EventPriority.Critical,
-                Groups = { EngineGroup },
+                Groups =
+                {
+                    EngineGroup
+                },
                 DataTypes =
                 {
                     DataType.Float64
@@ -183,10 +205,13 @@ public class TelemetryProducer
             {
                 Identifier = "Brakes.Overheat",
                 Name = "Brake Overheating",
-                ApplicationName =AppName,
+                ApplicationName = AppName,
                 Description = "Brake temperature exceeds safe limits",
                 Priority = EventPriority.High,
-                Groups = { BrakesGroup },
+                Groups =
+                {
+                    BrakesGroup
+                },
                 DataTypes =
                 {
                     DataType.String,
@@ -236,14 +261,9 @@ public class TelemetryProducer
     };
     public readonly string DataSource;
 
-    public TelemetryProducer(StreamingApiConfiguration configuration, string vehicleId)
+    public TelemetryProducer(StreamingApiClient streamingApiClient, string vehicleId)
     {
-        StreamingApiClient.Initialise(
-            configuration,
-            new CancellationTokenSourceProvider(),
-            new KafkaBrokerAvailabilityChecker(),
-            new LoggingDirectoryProvider(@"C:\Temp"));
-        var sessionManagement = StreamingApiClient.GetSessionManagementClient();
+        var sessionManagement = streamingApiClient.GetSessionManagementClient();
         var response = sessionManagement.CreateSession(
             new CreateSessionRequest
             {
@@ -270,7 +290,7 @@ public class TelemetryProducer
             });
 
         Console.WriteLine($"Session {response.SessionKey} created.");
-        this.packetWriter = StreamingApiClient.GetPacketWriterClient();
+        this.packetWriter = streamingApiClient.GetPacketWriterClient();
         this.vehicleId = vehicleId;
         this.SessionKey = response.SessionKey;
         this.DataSource = vehicleId;
@@ -376,7 +396,7 @@ public class TelemetryProducer
                         {
                             new DoubleSample
                             {
-                                Value =     GenerateOilPressure(),
+                                Value = GenerateOilPressure(),
                                 Status = DataStatus.Valid
                             }
                         }
@@ -511,7 +531,6 @@ public class TelemetryProducer
                     }
                 });
         }
-
     }
 
     // Simulation methods

@@ -44,7 +44,7 @@ public class RunKafkaDockerComposeFixture : IAsyncLifetime
             return;
         }
 
-        ShellCommandExecutor.Execute("docker-compose", $"-p stream-api down");
+        ShellCommandExecutor.Execute("docker compose", $"-p stream-api down");
         ShellCommandExecutor.Execute("docker", " volume prune -f");
 
         //give time to docker engine to remove volumes and containers completely

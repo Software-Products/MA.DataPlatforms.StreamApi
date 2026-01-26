@@ -18,15 +18,13 @@
 using Google.Protobuf;
 
 using MA.Streaming.API;
-using MA.Streaming.Core;
-using MA.Streaming.Core.Configs;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Local;
-using MA.Streaming.Proto.ServerComponent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace MA.Streaming.TestClient;
 
+[ExcludeFromCodeCoverage]
 public class TelemetryProcessor
 {
     private readonly string dataSource;
@@ -37,19 +35,15 @@ public class TelemetryProcessor
     private const string BrakesStream = "brakes";
     private const string SuspensionStream = "suspension";
     private const string PositionStream = "position";
+    private readonly StreamingApiClient streamingApiClient;
 
-    public TelemetryProcessor(StreamingApiConfiguration configuration, string dataSource, string sessionKey)
+    public TelemetryProcessor(StreamingApiClient streamingApiClient, string dataSource, string sessionKey)
     {
         this.dataSource = dataSource;
         this.sessionKey = sessionKey;
-        StreamingApiClient.Initialise(
-            configuration,
-            new CancellationTokenSourceProvider(),
-            new KafkaBrokerAvailabilityChecker(),
-            new LoggingDirectoryProvider(@"C:\Temp"));
-
-        this.packetReader = StreamingApiClient.GetPacketReaderClient();
-        this.connectionManager = StreamingApiClient.GetConnectionManagerClient();
+        this.streamingApiClient = streamingApiClient;
+        this.packetReader = this.streamingApiClient.GetPacketReaderClient();
+        this.connectionManager = this.streamingApiClient.GetConnectionManagerClient();
     }
 
     public async Task StartProcessing(CancellationToken cancellationToken = default)
@@ -77,7 +71,8 @@ public class TelemetryProcessor
                         0
                     } // Start from beginning
                 }
-            }, cancellationToken: cancellationToken);
+            },
+            cancellationToken: cancellationToken);
 
         Console.WriteLine($"Connected for processing with ID: {connection.Connection.Id}");
 
@@ -94,12 +89,12 @@ public class TelemetryProcessor
             var response = stream.ResponseStream.Current;
             foreach (var data in response.Response)
             {
-                await ProcessTelemetryPacket(data.Packet);
+                await this.ProcessTelemetryPacket(data.Packet);
             }
         }
     }
 
-    private static async Task ProcessTelemetryPacket(Packet packet)
+    private async Task ProcessTelemetryPacket(Packet packet)
     {
         try
         {
@@ -108,15 +103,15 @@ public class TelemetryProcessor
             {
                 case "PeriodicData":
                     var periodicData = PeriodicDataPacket.Parser.ParseFrom(packet.Content);
-                    await ProcessPeriodicData(periodicData);
+                    await this.ProcessPeriodicData(periodicData);
                     break;
                 case "RowData":
                     var rowData = RowDataPacket.Parser.ParseFrom(packet.Content);
-                    await ProcessRowData(rowData);
+                    await this.ProcessRowData(rowData);
                     break;
                 case "Event":
                     var eventData = EventPacket.Parser.ParseFrom(packet.Content);
-                    await ProcessEventData(eventData);
+                    await this.ProcessEventData(eventData);
                     break;
                 default:
                     Console.WriteLine($"Unknown packet type: {packet.Type}");
@@ -127,11 +122,11 @@ public class TelemetryProcessor
         {
             Console.WriteLine($"Error processing packet from {packet.SessionKey}: {ex.Message}");
         }
-        StreamingApiClient.GetSessionManagementClient();
 
+        this.streamingApiClient.GetSessionManagementClient();
     }
 
-    private static async Task ProcessPeriodicData(PeriodicDataPacket periodicData)
+    private async Task ProcessPeriodicData(PeriodicDataPacket periodicData)
     {
         // Extract parameter values based on the data format
         var parameterIds = periodicData.DataFormat.ParameterIdentifiers.ParameterIdentifiers ?? [];
@@ -150,13 +145,13 @@ public class TelemetryProcessor
             {
                 foreach (var sample in column.DoubleSamples.Samples)
                 {
-                    await ProcessParameterValue(parameterId, sample.Value, sample.Status);
+                    await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
                 }
             }
         }
     }
 
-    private static async Task ProcessRowData(RowDataPacket rowData)
+    private async Task ProcessRowData(RowDataPacket rowData)
     {
         var parameterIds = rowData.DataFormat.ParameterIdentifiers?.ParameterIdentifiers ?? [];
 
@@ -171,13 +166,13 @@ public class TelemetryProcessor
                     var parameterId = parameterIds[sampleIndex];
                     var sample = row.DoubleSamples.Samples[sampleIndex];
 
-                    await ProcessParameterValue(parameterId, sample.Value, sample.Status);
+                    await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
                 }
             }
         }
     }
 
-    private static async Task ProcessParameterValue(string parameterId, double value, DataStatus status)
+    private async Task ProcessParameterValue(string parameterId, double value, DataStatus status)
     {
         if (status != DataStatus.Valid)
         {
@@ -189,19 +184,19 @@ public class TelemetryProcessor
         switch (parameterId)
         {
             case "Engine.Rpm":
-                await ProcessEngineRpm(value);
+                await this.ProcessEngineRpm(value);
                 break;
             case "Engine.Temperature":
-                await ProcessEngineTemperature(value);
+                await this.ProcessEngineTemperature(value);
                 break;
             case "Engine.OilPressure":
-                await ProcessOilPressure(value);
+                await this.ProcessOilPressure(value);
                 break;
             case "Brakes.FrontLeft.Temperature":
             case "Brakes.FrontRight.Temperature":
             case "Brakes.RearLeft.Temperature":
             case "Brakes.RearRight.Temperature":
-                await ProcessBrakeTemperature(parameterId, value);
+                await this.ProcessBrakeTemperature(parameterId, value);
                 break;
             case "Position.Latitude":
             case "Position.Longitude":
@@ -215,11 +210,11 @@ public class TelemetryProcessor
         }
     }
 
-    private static async Task ProcessEngineRpm(double rpm)
+    private async Task ProcessEngineRpm(double rpm)
     {
         if (rpm > 6500)
         {
-            await RaiseAlert("Engine Over-rev", $"Engine RPM: {rpm:F0}");
+            await this.RaiseAlert("Engine Over-rev", $"Engine RPM: {rpm:F0}");
         }
 
         await UpdateDashboard(
@@ -230,11 +225,11 @@ public class TelemetryProcessor
             });
     }
 
-    private static async Task ProcessEngineTemperature(double temperature)
+    private async Task ProcessEngineTemperature(double temperature)
     {
         if (temperature > 95)
         {
-            await RaiseAlert("Engine Overheat", $"Engine temperature: {temperature:F1}°C");
+            await this.RaiseAlert("Engine Overheat", $"Engine temperature: {temperature:F1}°C");
         }
 
         await UpdateDashboard(
@@ -245,11 +240,11 @@ public class TelemetryProcessor
             });
     }
 
-    private static async Task ProcessOilPressure(double pressure)
+    private async Task ProcessOilPressure(double pressure)
     {
         if (pressure < 2.0)
         {
-            await RaiseAlert("Low Oil Pressure", $"Oil pressure: {pressure:F1} bar");
+            await this.RaiseAlert("Low Oil Pressure", $"Oil pressure: {pressure:F1} bar");
         }
 
         await UpdateDashboard(
@@ -260,11 +255,11 @@ public class TelemetryProcessor
             });
     }
 
-    private static async Task ProcessBrakeTemperature(string location, double temperature)
+    private async Task ProcessBrakeTemperature(string location, double temperature)
     {
         if (temperature > 350)
         {
-            await RaiseAlert("Brake Overheat", $"{location} temperature: {temperature:F1}°C");
+            await this.RaiseAlert("Brake Overheat", $"{location} temperature: {temperature:F1}°C");
         }
 
         await UpdateDashboard(
@@ -288,7 +283,7 @@ public class TelemetryProcessor
             });
     }
 
-    private static async Task ProcessEventData(EventPacket eventData)
+    private async Task ProcessEventData(EventPacket eventData)
     {
         var eventId = eventData.DataFormat.EventIdentifier;
         var timestamp = eventData.Timestamp;
@@ -298,11 +293,11 @@ public class TelemetryProcessor
         {
             case "Engine.OverTemp":
                 var temperature = values.Count > 0 ? values[0] : 0;
-                await RaiseAlert("Engine Overtemperature Event", $"Temperature: {temperature:F1}°C");
+                await this.RaiseAlert("Engine Overtemperature Event", $"Temperature: {temperature:F1}°C");
                 break;
             case "Brakes.Overheat":
                 var brakeLocation = values.Count > 1 ? $"Temperature: {values[1]:F1}°C" : "Unknown";
-                await RaiseAlert("Brake Overheating Event", brakeLocation);
+                await this.RaiseAlert("Brake Overheating Event", brakeLocation);
                 break;
             default:
                 Console.WriteLine($"Received event: {eventId} at {timestamp} with {values.Count} values");
@@ -310,7 +305,7 @@ public class TelemetryProcessor
         }
     }
 
-    private static async Task RaiseAlert(string alertType, string message)
+    private async Task RaiseAlert(string alertType, string message)
     {
         Console.WriteLine($"?? ALERT: {alertType} - {message}");
 
@@ -324,7 +319,7 @@ public class TelemetryProcessor
             Timestamp = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000000
         };
 
-        var packetWriter = StreamingApiClient.GetPacketWriterClient();
+        var packetWriter = this.streamingApiClient.GetPacketWriterClient();
         await packetWriter.WriteDataPacketAsync(
             new WriteDataPacketRequest
             {

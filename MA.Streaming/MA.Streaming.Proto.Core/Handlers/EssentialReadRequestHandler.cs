@@ -37,7 +37,11 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
 {
     private readonly IEssentialPacketsReaderConnectorService essentialPacketsReaderConnectorService;
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
+    private readonly ServerCallContext context;
     private readonly ILogger logger;
+    private readonly ReadEssentialsRequest request;
+    private readonly IServerStreamWriter<ReadEssentialsResponse> responseStream;
+    private readonly ConnectionDetails connectionDetails;
     private readonly GenericBuffer<PacketReceivedInfoEventArgs> writingBuffer;
     private readonly AutoResetEvent autoResetEvent = new(false);
     private IServerStreamWriter<ReadEssentialsResponse>? currentResponseStream;
@@ -45,13 +49,23 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
     public EssentialReadRequestHandler(
         IEssentialPacketsReaderConnectorService essentialPacketsReaderConnectorService,
         IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper,
-        ILogger logger)
+        ServerCallContext context,
+        ILogger logger,
+        ReadEssentialsRequest request,
+        IServerStreamWriter<ReadEssentialsResponse> responseStream,
+        ConnectionDetails connectionDetails)
     {
         this.essentialPacketsReaderConnectorService = essentialPacketsReaderConnectorService;
         this.connectionDtoMapper = connectionDtoMapper;
+        this.context = context;
         this.logger = logger;
+        this.request = request;
+        this.responseStream = responseStream;
+        this.connectionDetails = connectionDetails;
         this.writingBuffer = new GenericBuffer<PacketReceivedInfoEventArgs>(this, new CancellationTokenSourceProvider());
     }
+
+    public event EventHandler<DateTime>? HandlingStopped;
 
     public async Task ConsumeAsync(PacketReceivedInfoEventArgs receivedItem)
     {
@@ -62,12 +76,6 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
 
         try
         {
-            if (receivedItem is EndOfReadingPacketReceivedInfoEventArgs)
-            {
-                this.autoResetEvent.Set();
-                return;
-            }
-
             await this.currentResponseStream.WriteAsync(
                 new ReadEssentialsResponse
                 {
@@ -80,38 +88,47 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
                             SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
                         }
                     }
-                });
+                },
+                this.context.CancellationToken);
             MetricProviders.NumberOfEssentialPacketDelivered.WithLabels(receivedItem.ConnectionId.ToString(), receivedItem.DataSource).Inc();
         }
         catch (Exception ex)
         {
+            this.StopHandling();
             this.logger.Error($"exception happened in writing essential packet response using stream writer. exception {ex}");
-            this.autoResetEvent.Set();
+        }
+        finally
+        {
+            await Task.CompletedTask;
         }
     }
 
-    public void Handle(
-        ReadEssentialsRequest request,
-        IServerStreamWriter<ReadEssentialsResponse> responseStream,
-        ConnectionDetails connectionDetails)
+    public void Handle()
     {
-        this.currentResponseStream = responseStream;
+        this.currentResponseStream = this.responseStream;
         if (this.currentResponseStream == null)
         {
             return;
         }
 
         this.essentialPacketsReaderConnectorService.PacketReceived += this.EssentialPacketsReaderConnectorService_PacketReceived;
-        var endOfReadingPacketReceivedInfoEventArgs = new EndOfReadingPacketReceivedInfoEventArgs();
-        this.essentialPacketsReaderConnectorService.ReadingCompleted += (_, _) =>
-        {
-            this.essentialPacketsReaderConnectorService.PacketReceived -= this.EssentialPacketsReaderConnectorService_PacketReceived;
-            this.WriteDataToStreamAction(endOfReadingPacketReceivedInfoEventArgs);
-        };
 
-        this.essentialPacketsReaderConnectorService.Start(this.connectionDtoMapper.Map(new ConnectionInfo(request.Connection.Id, connectionDetails)));
+        var connectionInfo = new ConnectionInfo(this.request.Connection.Id, this.connectionDetails);
+        _ = Task.Run(
+            () =>
+            {
+                this.essentialPacketsReaderConnectorService.Start(this.connectionDtoMapper.Map(connectionInfo));
+            },
+            this.context.CancellationToken);
 
         this.autoResetEvent.WaitOne();
+    }
+
+    public void StopHandling()
+    {
+        this.essentialPacketsReaderConnectorService.Stop();
+        this.autoResetEvent.Set();
+        this.HandlingStopped?.Invoke(this, DateTime.Now);
     }
 
     private void EssentialPacketsReaderConnectorService_PacketReceived(object? sender, PacketReceivedInfoEventArgs e)
@@ -123,13 +140,5 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
     private void WriteDataToStreamAction(PacketReceivedInfoEventArgs receivedItem)
     {
         this.writingBuffer.AddData(receivedItem);
-    }
-
-    private sealed class EndOfReadingPacketReceivedInfoEventArgs : PacketReceivedInfoEventArgs
-    {
-        public EndOfReadingPacketReceivedInfoEventArgs()
-            : base(0, "", "", "", DateTime.MinValue, Array.Empty<byte>())
-        {
-        }
     }
 }

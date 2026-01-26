@@ -23,12 +23,12 @@ using Google.Protobuf.WellKnownTypes;
 
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
-using MA.Streaming.Core.Routing.EssentialsRouting;
 using MA.Streaming.Core.SessionManagement;
 using MA.Streaming.IntegrationTests.Base;
 using MA.Streaming.IntegrationTests.Helper;
@@ -45,19 +45,23 @@ using Xunit.Abstractions;
 namespace MA.Streaming.IntegrationTests;
 
 [Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
-public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
+public class SessionInfoServiceShould 
 {
-    private const string BrokerUrl = "localhost:9097";
+    private const string BrokerUrl = "localhost:9098";
     private readonly ITestOutputHelper outputHelper;
     private readonly SessionInfoService sessionInfoService;
     private readonly ThreadSafeInMemoryRepository<string, SessionDetailRecord> memoryRepository;
     private readonly TypeNameProvider typeNameProvider;
+    private readonly string sessionInfoTopicName;
 
-    public SessionInfoServiceShould(ITestOutputHelper outputHelper, KafkaTestsCleanUpFixture _)
+
+    public SessionInfoServiceShould(ITestOutputHelper outputHelper)
     {
         this.outputHelper = outputHelper;
         this.memoryRepository = new ThreadSafeInMemoryRepository<string, SessionDetailRecord>();
 
+        var domainPrefix = "SessionInfoDomain";
+        var domain = DomainCreator.Create(domainPrefix);
         var apiConfigurationProvider =
             new StreamingApiConfigurationProvider(
                 new StreamingApiConfiguration(
@@ -65,16 +69,25 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
                     BrokerUrl,
                     [],
                     integrateDataFormatManagement: false,
-                    integrateSessionManagement: true));
-        var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
+                    integrateSessionManagement: true,
+                    domain: domain));
         var logger = Substitute.For<ILogger>();
+        var repository = new RouteReadingWritingComponentRepository<KafkaRouteSubscriber>(logger);
         var kafkaRouteManager = new KafkaRouteManager(logger);
-        var sessionRouteSubscriberFactory = new SessionRouteSubscriberFactory(apiConfigurationProvider, cancellationTokenSourceProvider, kafkaRouteManager, logger);
+        var routingMappingInfoRepository = new RoutingMappingInfoRepository();
+        var domainNameProvider = new DomainNameProvider(domain);
+        var domainKafkaRouteMappingInfoCreator = new DomainKafkaRouteMappingInfoCreator(domainNameProvider, apiConfigurationProvider);
+        var kafkaRouteInfoCreator = new KafkaRouteInfoCreator(domainKafkaRouteMappingInfoCreator, apiConfigurationProvider, routingMappingInfoRepository);
+        var sessionRouteSubscriberFactory = new SessionRouteSubscriberFactory(
+            apiConfigurationProvider,
+            kafkaRouteManager,
+            kafkaRouteInfoCreator,
+            logger,
+            repository);
         var packetDtoFromByteFactory = new PacketDtoFromByteFactory(logger);
         var newSessionDtoFromByteFactory = new NewSessionPacketDtoFromByteFactory(logger);
         var endOfSessionDtoFromByteFactory = new EndOfSessionPacketDtoFromByteFactory(logger);
         var sessionInfoDtoFromByteFactory = new SessionInfoPacketDtoFromByteFactory(logger);
-        var essentialTopicNameCreator = new EssentialTopicNameCreator();
         var datasourceRepository = Substitute.For<IDataSourcesRepository>();
         this.typeNameProvider = new TypeNameProvider();
         this.sessionInfoService = new SessionInfoService(
@@ -87,10 +100,10 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
             newSessionDtoFromByteFactory,
             endOfSessionDtoFromByteFactory,
             this.typeNameProvider,
-            essentialTopicNameCreator,
+            kafkaRouteInfoCreator,
             datasourceRepository);
-        new KafkaClearHelper(BrokerUrl).Clear().Wait();
-        Task.Delay(2000).Wait();
+
+        this.sessionInfoTopicName = kafkaRouteInfoCreator.CreateSessionInfoRouteInfo().KafkaRouteTopicInfo.Topic;
     }
 
     [Fact]
@@ -122,17 +135,17 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
     {
         //arrange
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, this.sessionInfoTopicName);
 
         //act
 
         this.sessionInfoService.Start();
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, this.sessionInfoTopicName);
 
         //assert
-        beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
-        afterStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeTrue();
-        var sessionInfoTopicInfos = afterStartTopicInfos.Where(i => i.TopicName == Constants.SessionInfoTopicName).ToList();
+        beforeStartTopicInfos.Any(i => i.TopicName == this.sessionInfoTopicName).Should().BeFalse();
+        afterStartTopicInfos.Any(i => i.TopicName == this.sessionInfoTopicName).Should().BeTrue();
+        var sessionInfoTopicInfos = afterStartTopicInfos.Where(i => i.TopicName == this.sessionInfoTopicName).ToList();
         sessionInfoTopicInfos.Count.Should().Be(1);
         sessionInfoTopicInfos[0].Partition.Should().Be(0);
         sessionInfoTopicInfos[0].Offset.Should().Be(0);
@@ -144,7 +157,7 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         //arrange
         var kafkaPublishHelper = new KafkaPublishHelper(BrokerUrl);
         var kafkaTopicHelper = new KafkaTopicHelper();
-        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
+        var beforeStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, this.sessionInfoTopicName);
         var serviceStarted = false;
         var serviceStopped = false;
 
@@ -211,42 +224,42 @@ public class SessionInfoServiceShould : IClassFixture<KafkaTestsCleanUpFixture>
         };
 
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, this.typeNameProvider.NewSessionPacketTypeName, newSessionPacket.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, sessionInfoPacketName, newSessionInfoPacket.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, sessionInfoPacketName, updateSessionIdentifierPacket.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, sessionInfoPacketName, addAssociateSessionPacket1.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, sessionInfoPacketName, addAssociateSessionPacket2.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, sessionInfoPacketName, addAssociateSessionPacket2.ToByteString()),
             sessionKey);
         kafkaPublishHelper.PublishData(
-            Constants.SessionInfoTopicName,
+            this.sessionInfoTopicName,
             GetPacketBytes(sessionKey, this.typeNameProvider.EndOfSessionPacketTypeName, endSessionPacket.ToByteString()),
             sessionKey);
 
         //act
         this.sessionInfoService.Start();
-        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, Constants.SessionInfoTopicName);
+        var afterStartTopicInfos = kafkaTopicHelper.GetInfoByTopicContains(BrokerUrl, this.sessionInfoTopicName);
         //assert
         serviceStarted.Should().BeTrue();
         serviceStopped.Should().BeFalse();
-        beforeStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeFalse();
-        afterStartTopicInfos.Any(i => i.TopicName == Constants.SessionInfoTopicName).Should().BeTrue();
+        beforeStartTopicInfos.Any(i => i.TopicName == this.sessionInfoTopicName).Should().BeFalse();
+        afterStartTopicInfos.Any(i => i.TopicName == this.sessionInfoTopicName).Should().BeTrue();
         var sessions = this.memoryRepository.GetAll(i => i.DataSource == DataSource);
         sessions.Count.Should().Be(1);
         sessions[0].SessionKey.Should().Be(sessionKey);
