@@ -27,7 +27,8 @@ public class ConnectionDetailsDto
         string sessionKey,
         IReadOnlyList<long> streamOffsets,
         IReadOnlyList<string> streams,
-        bool excludeMainStream)
+        bool excludeMainStream,
+        string consumerGroup)
     {
         this.Id = id;
         this.DataSource = dataSource;
@@ -37,6 +38,7 @@ public class ConnectionDetailsDto
         this.StreamOffsets = streamOffsets;
         this.Streams = streams;
         this.ExcludeMainStream = excludeMainStream;
+        this.ConsumerGroup = consumerGroup;
     }
 
     public long Id { get; }
@@ -54,4 +56,6 @@ public class ConnectionDetailsDto
     public IReadOnlyList<string> Streams { get; }
 
     public bool ExcludeMainStream { get; }
+
+    public string ConsumerGroup { get; }
 }

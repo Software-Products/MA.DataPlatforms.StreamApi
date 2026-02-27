@@ -41,7 +41,8 @@ public class EssentialRouteConsumingConfigurationProviderTests
             sessionKey: "session",
             streamOffsets: new List<long>(),
             streams: new List<string>(),
-            excludeMainStream: false);
+            excludeMainStream: false,
+            "");
 
         var streamingApiConfig = Substitute.For<IStreamingApiConfiguration>();
         streamingApiConfig.BrokerUrl.Returns("broker-url");

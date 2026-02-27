@@ -34,6 +34,6 @@ public static class StreamingApiClientFactory
             cancellationTokenSourceProvider,
             kafkaBrokerAvailabilityChecker,
             loggingDirectoryProvider,
-            logger);
+            logger,null,null);
     }
 }

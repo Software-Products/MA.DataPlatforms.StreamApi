@@ -27,7 +27,6 @@ using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.OpenData;
-using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
 
 namespace MA.Streaming.Proto.Core.Handlers;
@@ -54,14 +53,16 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         IIdentifierFilter parameterIdentifierFilter,
         IIdentifierFilter eventIdentifierFilter,
         bool includeMarkers,
-        IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository)
+        IInMemoryRepository<ValueTuple<string, ulong, DataFormatTypeDto>, DataFormatRecord> dataFormatByUlongIdentifierRepository,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
         : base(
             connectionDetailsDto,
             context,
             connectorService,
             batchingResponses,
             logger,
-            autoResetEvent)
+            autoResetEvent,
+            streamingApiConfigurationProvider)
 
     {
         this.responseStream = responseStream;
@@ -83,34 +84,41 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
     {
         try
         {
-            // Filter packets 
-            var packetResponses = receivedItems.Where(i => this.IncludePacket(
-                Packet.Parser.ParseFrom(i.MessageBytes))
-            ).Select(i => new PacketResponse
+            var streamPacketCounter = new Dictionary<string, int>();
+            var packetsResponse = new List<PacketResponse>();
+            foreach (var receivedItem in receivedItems)
             {
-                Packet = Packet.Parser.ParseFrom(i.MessageBytes),
-                Stream = i.Stream,
-                SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
-            }).ToList();
-
-            if (packetResponses.Any())
-            {
-                this.WritingBuffer.AddData(
-                    new ReadDataPacketsResponse
-                    {
-                        Response =
-                        {
-                            packetResponses
-                        }
-                    });
-                var streamItems = receivedItems.GroupBy(i => i.Stream);
-                foreach (var streamItem in streamItems)
+                var packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes);
+                if (!this.IncludePacket(packet))
                 {
-                    var increment = streamItem.Count();
-                    MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.ConnectionDetailsDto.DataSource, streamItem.Key)
-                        .Inc(increment);
+                    return;
                 }
+
+                if (!streamPacketCounter.TryAdd(receivedItem.Stream, 1))
+                {
+                    streamPacketCounter[receivedItem.Stream]++;
+                }
+
+                packetsResponse.Add(
+                    new PacketResponse
+                    {
+                        Stream = receivedItem.Stream,
+                        Packet = packet,
+                        SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
+                    });
             }
+
+            var readDataPacketsResponse = new ReadDataPacketsResponse
+            {
+                Response =
+                {
+                    packetsResponse
+                }
+            };
+
+            this.PushDataToWritingBuffer(packetsResponse, streamPacketCounter, readDataPacketsResponse);
+
+            streamPacketCounter.Clear();
         }
         catch (Exception ex)
         {
@@ -222,7 +230,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         else
         {
             var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-                (dataSource: dataSource, dataFormatIdentifier: dataFormatIdentifier, dataFormatType: DataFormatTypeDto.Parameter));
+                (dataSource, dataFormatIdentifier, dataFormatType: DataFormatTypeDto.Parameter));
             if (dataFormatRecord == null)
             {
                 this.Logger.Warning($"No corresponding parameters list for data format identifier: {dataFormatIdentifier}");
@@ -265,7 +273,7 @@ public class ReadDataPacketResponseStreamWriterHandler : ReadPacketResponseStrea
         else
         {
             var dataFormatRecord = this.dataFormatByUlongIdentifierRepository.Get(
-                (dataSource: dataSource, dataFormatIdentifier: dataFormatIdentifier, dataFormatType: DataFormatTypeDto.Event));
+                (dataSource, dataFormatIdentifier, dataFormatType: DataFormatTypeDto.Event));
             if (dataFormatRecord == null)
             {
                 this.Logger.Warning($"No corresponding event for data format identifier: {dataFormatIdentifier}");

@@ -62,7 +62,7 @@ public class ConsumingConfigurationProvider : IConsumingConfigurationProvider
             new KafkaConsumingConfig(
                 new KafkaListeningConfig(
                     this.StreamApiConfig.BrokerUrl,
-                    $"Main_Data_Consuming_{Guid.NewGuid()}",
+                    string.IsNullOrWhiteSpace(this.ConnectionDetailsDto.ConsumerGroup) ? $"Main_Data_Consuming_{Guid.NewGuid()}" : this.ConnectionDetailsDto.ConsumerGroup,
                     AutoOffsetResetMode.FromOffset,
                     this.ConnectionDetailsDto.MainOffset),
                 mainRoute,
@@ -88,7 +88,7 @@ public class ConsumingConfigurationProvider : IConsumingConfigurationProvider
                     new KafkaConsumingConfig(
                         new KafkaListeningConfig(
                             this.StreamApiConfig.BrokerUrl,
-                            $"Stream_Data_Consuming_{Guid.NewGuid()}",
+                            string.IsNullOrWhiteSpace(this.ConnectionDetailsDto.ConsumerGroup) ? $"Stream_Data_Consuming_{Guid.NewGuid()}" : this.ConnectionDetailsDto.ConsumerGroup,
                             AutoOffsetResetMode.FromOffset,
                             streamOffset),
                         kafkaRoute,

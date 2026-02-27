@@ -34,19 +34,25 @@ public class StreamingApiClient
     private readonly IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker;
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
     private readonly ILogger? logger;
+    private readonly int? grpcMaxSendMessageSize;
+    private readonly int? grpcMaxReceiveMessageSize;
 
     internal StreamingApiClient(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
         ILoggingDirectoryProvider loggingDirectoryProvider,
-        ILogger? logger)
+        ILogger? logger,
+        int? grpcMaxSendMessageSize = null,
+        int? grpcMaxReceiveMessageSize = null)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.kafkaBrokerAvailabilityChecker = kafkaBrokerAvailabilityChecker;
         this.loggingDirectoryProvider = loggingDirectoryProvider;
         this.logger = logger;
+        this.grpcMaxSendMessageSize = grpcMaxSendMessageSize;
+        this.grpcMaxReceiveMessageSize = grpcMaxReceiveMessageSize;
         this.cancellationToken = cancellationTokenSourceProvider.Provide().Token;
     }
 
@@ -74,7 +80,9 @@ public class StreamingApiClient
                 this.cancellationTokenSourceProvider,
                 this.kafkaBrokerAvailabilityChecker,
                 this.loggingDirectoryProvider,
-                logger: this.logger);
+                logger: this.logger,
+                grpcMaxReceiveMessageSize: this.grpcMaxReceiveMessageSize,
+                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize);
             this.server.Start().Wait(TimeSpan.FromSeconds(10));
             this.SetupGrpcChannel();
         }
@@ -110,7 +118,10 @@ public class StreamingApiClient
                 this.streamingApiConfiguration,
                 this.cancellationTokenSourceProvider,
                 this.kafkaBrokerAvailabilityChecker,
-                this.loggingDirectoryProvider);
+                this.loggingDirectoryProvider,
+                logger: this.logger,
+                grpcMaxReceiveMessageSize: this.grpcMaxReceiveMessageSize,
+                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize);
             await this.server.StartAsync(this.cancellationToken);
             this.SetupGrpcChannel();
             this.Initialised = true;

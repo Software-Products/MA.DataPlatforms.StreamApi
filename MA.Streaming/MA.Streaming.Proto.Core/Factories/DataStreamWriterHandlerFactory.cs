@@ -36,6 +36,7 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
     private readonly IActiveConnectionManager activeConnectionManager;
     private readonly IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper;
     private readonly ILogger logger;
+    private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
     private readonly IRoutingMappingInfoRepository routingMappingInfoRepository;
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration config;
@@ -46,7 +47,7 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
         IActiveConnectionManager activeConnectionManager,
         IMapper<ConnectionInfo, ConnectionDetailsDto> connectionDtoMapper,
         ILogger logger,
-        IStreamingApiConfigurationProvider apiConfigurationProvider,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         IRoutingMappingInfoRepository routingMappingInfoRepository,
         IKafkaRouteInfoCreator kafkaRouteInfoCreator)
     {
@@ -55,9 +56,10 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
         this.activeConnectionManager = activeConnectionManager;
         this.connectionDtoMapper = connectionDtoMapper;
         this.logger = logger;
+        this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.routingMappingInfoRepository = routingMappingInfoRepository;
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
-        this.config = apiConfigurationProvider.Provide();
+        this.config = streamingApiConfigurationProvider.Provide();
     }
 
     public async Task<IReadDataPacketResponseStreamWriterHandler?> Create(
@@ -113,7 +115,8 @@ public class DataStreamWriterHandlerFactory : IDataStreamWriterHandlerFactory
                 parameterIdentifierFilter,
                 eventIdentifierFilter,
                 includeMarkers,
-                dataFormatByUlongIdentifierRepository);
+                dataFormatByUlongIdentifierRepository,
+                this.streamingApiConfigurationProvider);
             return await Task.FromResult(handler);
         }
         catch (Exception ex)

@@ -28,7 +28,6 @@ public class DataSourcesRepository : IDataSourcesRepository
 
     private readonly object readWriteLock = new();
     private HashSet<string> trackedTopics = [];
-    private Dictionary<string, string> topicToDataSourceMap = new();
 
     private bool initiated;
 

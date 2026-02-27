@@ -24,7 +24,6 @@ using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.OpenData;
-using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
 
 namespace MA.Streaming.Proto.Core.Handlers;
@@ -40,14 +39,16 @@ public class ReadPacketResponseStreamWriterHandler : ReadPacketResponseStreamWri
         IPacketReaderConnectorService connectorService,
         bool batchingResponses,
         ILogger logger,
-        AutoResetEvent autoResetEvent)
+        AutoResetEvent autoResetEvent,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
         : base(
             connectionDetailsDto,
             context,
             connectorService,
             batchingResponses,
             logger,
-            autoResetEvent)
+            autoResetEvent,
+            streamingApiConfigurationProvider)
     {
         this.responseStream = responseStream;
     }
@@ -61,28 +62,36 @@ public class ReadPacketResponseStreamWriterHandler : ReadPacketResponseStreamWri
     {
         try
         {
-            var packetResponses = receivedItems.Select(i => new PacketResponse
+            var streamPacketCounter = new Dictionary<string, int>();
+            var packetsResponse = new List<PacketResponse>();
+            foreach (var receivedItem in receivedItems)
             {
-                Packet = Packet.Parser.ParseFrom(i.MessageBytes),
-                Stream = i.Stream,
-                SubmitTime = Timestamp.FromDateTime(i.SubmitTime)
-            }).ToList();
-
-            this.WritingBuffer.AddData(
-                new ReadPacketsResponse
+                var packet = Packet.Parser.ParseFrom(receivedItem.MessageBytes);
+                if (!streamPacketCounter.TryAdd(receivedItem.Stream, 1))
                 {
-                    Response =
+                    streamPacketCounter[receivedItem.Stream]++;
+                }
+
+                packetsResponse.Add(
+                    new PacketResponse
                     {
-                        packetResponses
-                    }
-                });
-            var streamItems = receivedItems.GroupBy(i => i.Stream);
-            foreach (var streamItem in streamItems)
-            {
-                var increment = streamItem.Count();
-                MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.ConnectionDetailsDto.DataSource, streamItem.Key)
-                    .Inc(increment);
+                        Stream = receivedItem.Stream,
+                        Packet = packet,
+                        SubmitTime = Timestamp.FromDateTime(receivedItem.SubmitTime)
+                    });
             }
+
+            var readPacketsResponse = new ReadPacketsResponse
+            {
+                Response =
+                {
+                    packetsResponse
+                }
+            };
+
+            this.PushDataToWritingBuffer(packetsResponse, streamPacketCounter, readPacketsResponse);
+
+            streamPacketCounter.Clear();
         }
         catch (Exception ex)
         {
