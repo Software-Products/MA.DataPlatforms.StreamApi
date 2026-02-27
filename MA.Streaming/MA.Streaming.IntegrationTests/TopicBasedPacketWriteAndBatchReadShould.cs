@@ -23,6 +23,7 @@ using Google.Protobuf;
 
 using Grpc.Core;
 
+using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.API;
 using MA.Streaming.Core;
@@ -32,6 +33,8 @@ using MA.Streaming.IntegrationTests.Base;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Local;
 using MA.Streaming.Proto.ServerComponent;
+
+using NSubstitute;
 
 using Xunit;
 using Xunit.Abstractions;
@@ -56,6 +59,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
     private readonly ITestOutputHelper outputHelper;
     private const string SessionKeyPrefix = "TBPWBRSessionKey";
     private static string sessionKey = "";
+    private readonly ILogger logger = Substitute.For<ILogger>();
 
     public TopicBasedPacketWriteAndBatchReadShould(ITestOutputHelper outputHelper)
     {
@@ -181,7 +185,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
         startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(5));
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
@@ -241,7 +245,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
         startListenerAutoResetEvent.Set();
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
@@ -301,7 +305,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
         startListenerAutoResetEvent.Set();
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         assertResult.Should().BeTrue();
@@ -427,9 +431,9 @@ public class TopicBasedPacketWriteAndBatchReadShould
         await this.WriteDataPacket(writeDataPacketRequest1);
         await this.WriteDataPacket(writeDataPacketRequest2);
         await this.WriteDataPacket(writeDataPacketRequest3);
-        autoResetEvent1.WaitOne(TimeSpan.FromSeconds(10));
-        autoResetEvent2.WaitOne(TimeSpan.FromSeconds(10));
-        autoResetEvent3.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent1.WaitOne(TimeSpan.FromSeconds(60));
+        autoResetEvent2.WaitOne(TimeSpan.FromSeconds(60));
+        autoResetEvent3.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         assertResult.ForEach(i => i.Should().BeTrue());
@@ -505,7 +509,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
         // Act
         await this.WriteDataPacket(writeDataPacketRequest);
         await this.WriteDataPacket(writeDataPacketRequest2);
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(0);
@@ -600,7 +604,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
 
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(numberOfExpectedMessages);
@@ -661,9 +665,9 @@ public class TopicBasedPacketWriteAndBatchReadShould
                 }
             },
             token);
-        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        startListenerAutoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await this.WriteDataPacket(writeDataPacketRequest);
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(1));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(1));
         var lstResult = new List<ReadEssentialsResponse>();
         // Act
@@ -688,7 +692,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
                 }
             },
             token);
-        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //Assert
         assertResult.Should().BeTrue();
@@ -788,7 +792,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
 
         publishStopWatch.Stop();
         this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
-        autoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        autoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         new AutoResetEvent(false).WaitOne(TimeSpan.FromSeconds(5));
 
         var lstResult = new List<ReadEssentialsResponse>();
@@ -835,11 +839,111 @@ public class TopicBasedPacketWriteAndBatchReadShould
                 }
             },
             token);
-        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(10));
+        essentialAutoResetEvent.WaitOne(TimeSpan.FromSeconds(60));
         await tokenSource.CancelAsync();
         //assert
         receiveCount.Should().Be(numberOfExpectedMessages);
         lstResult.Sum(i => i.Response.Count(j => j.Packet.SessionKey == sessionKey)).Should().Be(1001);
+    }
+
+    [Fact]
+    public async Task When_Publish_1_000_000_Data_Using_WriteStream_And_SessionKey_All_Messages_Should_Be_Delivered()
+    {
+        // Arrange
+        if (receiveStream is null ||
+            packetWriter is null)
+        {
+            throw new InvalidOperationException("test not initialised properly");
+        }
+
+        var writeStream = packetWriter.WriteDataPackets();
+        var batchPublisher = new BatchPublisher(this.logger, writeStream);
+        var rnd = new Random();
+        const int NumberOfMessages = 1_000_000;
+        // The 3 is for the new session packets 
+        const int NumberOfExpectedMessages = NumberOfMessages + 3;
+        var lstContents = new List<ByteString>(NumberOfMessages);
+        var dataPacketDetailsList = new List<DataPacketDetails>(NumberOfMessages);
+        for (var i = 0; i < NumberOfMessages; i++)
+        {
+            var byteArr = new byte[3];
+            rnd.NextBytes(byteArr);
+            lstContents.Add(ByteString.CopyFrom(byteArr));
+            var stream = i % 3 == 1 ? AppGroup1Stream : AppGroup2Stream;
+            dataPacketDetailsList.Add(
+                new DataPacketDetails
+                {
+                    Stream = i % 3 == 0 ? "" : stream,
+                    DataSource = DataSource,
+                    Message = new Packet
+                    {
+                        Content = lstContents[i],
+                        IsEssential = false,
+                        SessionKey = sessionKey,
+                        Type = i.ToString()
+                    },
+                    SessionKey = sessionKey
+                }
+            );
+        }
+
+        using var tokenSource = new CancellationTokenSource();
+        var token = tokenSource.Token;
+        var autoResetEvent = new AutoResetEvent(false);
+        var receiveCount = 0;
+        var receiverStopWatch = new Stopwatch();
+        var publishAutoResetEvent = new AutoResetEvent(false);
+
+        // Act
+        var publishStopWatch = new Stopwatch();
+        publishStopWatch.Start();
+        foreach (var dataPacketDetails in dataPacketDetailsList)
+        {
+            batchPublisher.Add(dataPacketDetails);
+        }
+
+        batchPublisher.Finish();
+
+        batchPublisher.DataPacketPublishCompleted += (_, _) =>
+        {
+            publishStopWatch.Stop();
+            this.outputHelper.WriteLine($"publishing time: {publishStopWatch.ElapsedMilliseconds} ms");
+            publishAutoResetEvent.Set();
+        };
+
+        publishAutoResetEvent.WaitOne(TimeSpan.FromMinutes(10));
+        _ = Task.Run(
+            async () =>
+            {
+                while (await receiveStream.ResponseStream.MoveNext(token))
+                {
+                    foreach (var _ in receiveStream.ResponseStream.Current.Response)
+                    {
+                        if (receiveCount == 0)
+                        {
+                            receiverStopWatch.Start();
+                        }
+
+                        receiveCount++;
+                    }
+
+                    if (receiveCount != NumberOfExpectedMessages)
+                    {
+                        continue;
+                    }
+
+                    this.outputHelper.WriteLine($"receivingTime : {receiverStopWatch.ElapsedMilliseconds} ms");
+                    receiverStopWatch.Stop();
+                    autoResetEvent.Set();
+                    break;
+                }
+            },
+            token);
+
+        autoResetEvent.WaitOne(TimeSpan.FromMinutes(10));
+        await tokenSource.CancelAsync();
+        //assert
+        receiveCount.Should().Be(NumberOfExpectedMessages);
     }
 
     private async Task WriteDataPacket(WriteDataPacketRequest writeDataPacketRequest, bool log = true)

@@ -20,9 +20,13 @@
     "StreamApiPort": 13579,
     "Domain": "DefaultDomain",
     "InitialisationTimeoutSeconds": 5,
-    "TerminationTimeoutSeconds": 5
+    "TerminationTimeoutSeconds": 5,
+    "EnableGrpcReflection": false
   },
-
+  "GrpcConfig": {
+    "MaxReceiveMessageSize": 4194304,
+    "MaxSendMessageSize": 4194304
+  },
   "Serilog": {
     "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
     "MinimumLevel": {

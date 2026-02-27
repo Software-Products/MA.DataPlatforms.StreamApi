@@ -20,6 +20,7 @@ using MA.DataPlatforms.Secu4.RouterComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
+using MA.Streaming.Core.Configs;
 using MA.Streaming.Proto.Core.Abstractions;
 using MA.Streaming.Proto.Core.Services;
 
@@ -45,6 +46,8 @@ public sealed class Server : IServer
     private IRouteReadingWritingComponentRepository<KafkaRouter>? routerRepository;
     private IRouteReadingWritingComponentRepository<KafkaRouteSubscriber>? routeSubscriberRepository;
     private readonly ILogger? logger;
+    private readonly int grpcMaxSendMessageSize;
+    private readonly int grpcMaxReceiveMessageSize;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
@@ -52,7 +55,9 @@ public sealed class Server : IServer
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
         ILoggingDirectoryProvider loggingDirectoryProvider,
         bool registerServices = false,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        int? grpcMaxSendMessageSize = null,
+        int? grpcMaxReceiveMessageSize = null)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
@@ -60,6 +65,44 @@ public sealed class Server : IServer
         this.loggingDirectoryProvider = loggingDirectoryProvider;
         this.registerServices = registerServices;
         this.logger = logger;
+        this.grpcMaxSendMessageSize = grpcMaxSendMessageSize ?? 4 * 1024 * 1024; //4 MB default
+        this.grpcMaxReceiveMessageSize = grpcMaxReceiveMessageSize ?? 4 * 1024 * 1024; //4 MB default
+        this.streamingApiConfiguration = this.ValidateStreamApiConfiguration(streamingApiConfiguration);
+    }
+
+    private IStreamingApiConfiguration ValidateStreamApiConfiguration(IStreamingApiConfiguration validatingStreamingApiConfiguration)
+    {
+        var batchingSizesBytes = this.streamingApiConfiguration.BatchingSizesKb * 1024;
+        if (batchingSizesBytes <= this.grpcMaxSendMessageSize &&
+            batchingSizesBytes <= this.grpcMaxReceiveMessageSize)
+        {
+            return validatingStreamingApiConfiguration;
+        }
+
+        this.logger?.Warning(
+            $"batching size bigger than gRPC max message size which can lead to message size exceeded exception: {batchingSizesBytes} > {this.grpcMaxSendMessageSize} (send), {this.grpcMaxReceiveMessageSize} (receive)");
+        var batchingSizesKb = Math.Min(
+            this.grpcMaxSendMessageSize / 1024,
+            this.grpcMaxReceiveMessageSize / 1024);
+
+        this.logger?.Info($"batching size reduced to gRPC max message size: {batchingSizesKb} KB");
+
+        return new StreamingApiConfiguration(
+            validatingStreamingApiConfiguration.StreamCreationStrategy,
+            validatingStreamingApiConfiguration.BrokerUrl,
+            validatingStreamingApiConfiguration.PartitionMappings,
+            validatingStreamingApiConfiguration.StreamApiPort,
+            validatingStreamingApiConfiguration.IntegrateSessionManagement,
+            validatingStreamingApiConfiguration.IntegrateDataFormatManagement,
+            validatingStreamingApiConfiguration.UseRemoteKeyGenerator,
+            validatingStreamingApiConfiguration.RemoteKeyGeneratorServiceAddress,
+            validatingStreamingApiConfiguration.BatchingResponses,
+            validatingStreamingApiConfiguration.InitialisationTimeoutSeconds,
+            validatingStreamingApiConfiguration.TerminationTimeoutSeconds,
+            validatingStreamingApiConfiguration.Domain,
+            batchingSizesKb,
+            validatingStreamingApiConfiguration.BatchingTimeMs,
+            validatingStreamingApiConfiguration.EnableGrpcReflection);
     }
 
     public void Dispose()
@@ -134,7 +177,17 @@ public sealed class Server : IServer
         var builder = WebApplication.CreateBuilder();
 
         builder.WebHost.ConfigureKestrel(this.ConfigureListenOptions);
-        builder.Services.AddGrpc();
+
+        builder.Services.AddGrpc(options =>
+        {
+            options.MaxReceiveMessageSize = this.grpcMaxReceiveMessageSize;
+            options.MaxSendMessageSize = this.grpcMaxSendMessageSize;
+        });
+
+        if (this.streamingApiConfiguration.EnableGrpcReflection)
+        {
+            builder.Services.AddGrpcReflection();
+        }
 
         new ServiceConfigurator(
             this.streamingApiConfiguration,
@@ -155,6 +208,12 @@ public sealed class Server : IServer
             "/",
             () =>
                 "Communication with this gRPC endpoint must be made through a Stream API client.");
+
+        if (this.streamingApiConfiguration.EnableGrpcReflection)
+        {
+            this.webApp.MapGrpcReflectionService();
+        }
+
         var loggerService = this.webApp.Services.GetService<ILogger>();
         this.routerRepository = this.webApp.Services.GetService<IRouteReadingWritingComponentRepository<KafkaRouter>>();
         this.routeSubscriberRepository = this.webApp.Services.GetService<IRouteReadingWritingComponentRepository<KafkaRouteSubscriber>>();

@@ -23,15 +23,12 @@ using Microsoft.Extensions.Configuration;
 
 using Serilog;
 
-using ILogger = MA.Common.Abstractions.ILogger;
-
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
 internal static class ServerStarter
 {
     private static bool started;
     private static readonly object HandleRequestLock = new();
-    private static ILogger? logger;
 
     public static void Start()
     {
@@ -43,7 +40,7 @@ internal static class ServerStarter
                 {
                     return;
                 }
-                
+
                 var configuration = new ConfigurationBuilder()
                     .SetBasePath(Directory.GetCurrentDirectory())
                     .AddJsonFile(AppDefinition.StreamApiConfigFilePath, optional: false, reloadOnChange: true)
@@ -58,11 +55,12 @@ internal static class ServerStarter
 
                 Log.Logger = serilogLogger;
 
-                logger = new SerilogLoggerAdapter(serilogLogger);
+                var logger = new SerilogLoggerAdapter(serilogLogger);
 
                 logger.Info("Starting Stream API Server...");
                 var streamApiSection = configuration.GetSection("StreamApiConfig");
-                var hostConfig = streamApiSection.Get<HostStreamApiConfiguration>();
+                var hostConfig = streamApiSection.Get<StreamingApiConfiguration>();
+                var grpConfiguration = configuration.GetSection("GrpcConfig").Get<GrpcConfiguration>();
 
                 if (hostConfig == null)
                 {
@@ -81,14 +79,21 @@ internal static class ServerStarter
                     hostConfig.RemoteKeyGeneratorServiceAddress,
                     hostConfig.BatchingResponses,
                     hostConfig.InitialisationTimeoutSeconds,
-                    hostConfig.TerminationTimeoutSeconds);
+                    hostConfig.TerminationTimeoutSeconds,
+                    hostConfig.Domain,
+                    hostConfig.BatchingSizesKb,
+                    hostConfig.BatchingTimeMs,
+                    hostConfig.EnableGrpcReflection);
 
                 var server = new Server(
                     streamApiConfig,
                     new CancellationTokenSourceProvider(),
                     new KafkaBrokerAvailabilityChecker(),
                     new LoggingDirectoryProvider(""),
-                    logger: logger);
+                    logger: logger,
+                    grpcMaxReceiveMessageSize: grpConfiguration?.MaxReceiveMessageSize,
+                    grpcMaxSendMessageSize: grpConfiguration?.MaxReceiveMessageSize);
+
                 _ = Task.Run(async () =>
                 {
                     try

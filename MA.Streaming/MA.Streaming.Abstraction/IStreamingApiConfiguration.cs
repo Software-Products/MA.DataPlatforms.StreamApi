@@ -39,5 +39,13 @@ public interface IStreamingApiConfiguration
 
     public uint InitialisationTimeoutSeconds { get; }
 
+    public uint TerminationTimeoutSeconds { get; }
+
     public string Domain { get; }
+
+    public int BatchingSizesKb { get; }
+
+    public int BatchingTimeMs { get; }
+
+    bool EnableGrpcReflection { get; }
 }

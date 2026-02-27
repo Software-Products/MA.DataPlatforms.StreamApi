@@ -32,6 +32,7 @@ public class ConnectionDetailDtoMapper : IMapper<ConnectionInfo, ConnectionDetai
             source.ConnectionDetails.SessionKey,
             source.ConnectionDetails.StreamOffsets,
             source.ConnectionDetails.Streams,
-            source.ConnectionDetails.ExcludeMainStream);
+            source.ConnectionDetails.ExcludeMainStream,
+            source.ConnectionDetails.ConsumerGroup);
     }
 }

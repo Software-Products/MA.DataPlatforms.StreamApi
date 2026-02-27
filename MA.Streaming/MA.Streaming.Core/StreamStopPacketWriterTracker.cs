@@ -35,12 +35,10 @@ public class StreamStopPacketWriterTracker : IStreamStopPacketWriterTracker
     public StreamStopPacketTrackingResult Track(WriteDataPacketRequestDto request, string refinedStream)
     {
         var dicKey = (request.DataSource, request.SessionKey);
-        if (this.capturedStreamStoppedPackets.TryGetValue(dicKey, out var capturedStreamHashSet))
+        if (this.capturedStreamStoppedPackets.TryGetValue(dicKey, out var capturedStreamHashSet) &&
+            capturedStreamHashSet.Contains(refinedStream))
         {
-            if (capturedStreamHashSet.Contains(refinedStream))
-            {
-                return new StreamStopPacketTrackingResult();
-            }
+            return new StreamStopPacketTrackingResult();
         }
 
         if (capturedStreamHashSet == null)

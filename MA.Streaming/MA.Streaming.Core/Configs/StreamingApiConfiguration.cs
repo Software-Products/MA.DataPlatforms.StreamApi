@@ -33,9 +33,11 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         bool? batchingResponses = false,
         uint? initialisationTimeoutSeconds = 3,
         uint? terminationTimeoutSeconds = 1,
-        string? domain = null)
+        string? domain = null,
+        int? batchingSizesKb = null,
+        int? batchingTimeMs = null,
+        bool? enableGrpcReflection = false)
     {
-        this.TerminationTimeoutSeconds = terminationTimeoutSeconds ?? 1;
         this.StreamCreationStrategy = streamCreationStrategy ?? StreamCreationStrategy.PartitionBased;
         this.BrokerUrl = brokerUrl ?? "localhost:9092";
         this.PartitionMappings = partitionMappings ?? [];
@@ -47,6 +49,10 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         this.IntegrateDataFormatManagement = integrateDataFormatManagement ?? true;
         this.IntegrateSessionManagement = integrateSessionManagement ?? true;
         this.Domain = domain ?? "";
+        this.TerminationTimeoutSeconds = terminationTimeoutSeconds ?? 1;
+        this.BatchingSizesKb = batchingSizesKb ?? 4 * 1024;
+        this.BatchingTimeMs = batchingTimeMs ?? 50;
+        this.EnableGrpcReflection = enableGrpcReflection ?? false;
     }
 
     public StreamCreationStrategy StreamCreationStrategy { get; }
@@ -72,4 +78,10 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
     public uint TerminationTimeoutSeconds { get; }
 
     public string Domain { get; }
+
+    public int BatchingSizesKb { get; }
+
+    public int BatchingTimeMs { get; }
+
+    public bool EnableGrpcReflection { get; }   
 }

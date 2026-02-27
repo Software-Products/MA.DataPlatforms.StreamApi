@@ -29,7 +29,7 @@ public class RoutingMappingInfoRepository : IRoutingMappingInfoRepository
     {
         lock (this.lockObj)
         {
-            if (!this.routeInfos.TryGetValue(routeInfo.RouteNameInfo.Name, out var value))
+            if (!this.routeInfos.TryGetValue(routeInfo.RouteNameInfo.Name, out _))
             {
                 this.routeInfos.Add(routeInfo.RouteNameInfo.Name, routeInfo);
             }

@@ -19,6 +19,7 @@ using Grpc.Core;
 
 using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
+using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Abstractions;
@@ -34,7 +35,7 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
     internal readonly bool BatchingResponses;
     internal readonly ILogger Logger;
     internal readonly AutoResetEvent AutoResetEvent;
-    internal readonly TimeAndSizeWindowBatchProcessor<PacketReceivedInfoEventArgs>? TimeWindowBatchProcessor;
+    internal readonly SizeBasedBatchProcessor<PacketReceivedInfoEventArgs>? TimeWindowBatchProcessor;
     internal readonly GenericBuffer<T> WritingBuffer;
     internal bool Started;
 
@@ -44,7 +45,8 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
         IPacketReaderConnectorService connectorService,
         bool batchingResponses,
         ILogger logger,
-        AutoResetEvent autoResetEvent)
+        AutoResetEvent autoResetEvent,
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
     {
         this.ConnectionDetailsDto = connectionDetailsDto;
         this.Context = context;
@@ -54,10 +56,17 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
         this.AutoResetEvent = autoResetEvent;
         this.ConnectionId = connectionDetailsDto.Id;
         this.ConnectorService.PacketReceived += this.ConnectorService_PacketReceived;
+        var config = streamingApiConfigurationProvider.Provide();
         if (batchingResponses)
         {
             this.TimeWindowBatchProcessor =
-                new TimeAndSizeWindowBatchProcessor<PacketReceivedInfoEventArgs>(this.WriteDataToStreamActionAsync, new CancellationTokenSource());
+                new SizeBasedBatchProcessor<PacketReceivedInfoEventArgs>(
+                    logger,
+                    this.WriteDataToStreamActionAsync,
+                    PacketReceivedInfoSizeCalculator.CalculateSize,
+                    new CancellationTokenSource(),
+                    maxBatchSizeBytes: config.BatchingSizesKb * 1024,
+                    timeWindowMilliseconds: config.BatchingTimeMs);
         }
 
         this.WritingBuffer = new GenericBuffer<T>(this);
@@ -109,6 +118,22 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
         else
         {
             this.WriteDataToStreamAction(e);
+        }
+    }
+
+    protected void PushDataToWritingBuffer(List<PacketResponse> packetsResponse, Dictionary<string, int> streamPacketCounter, T data)
+    {
+        if (packetsResponse.Count <= 0)
+        {
+            return;
+        }
+
+        this.WritingBuffer.AddData(data);
+
+        foreach (var (key, increment) in streamPacketCounter)
+        {
+            MetricProviders.NumberOfDataPacketDelivered.WithLabels(this.ConnectionId.ToString(), this.ConnectionDetailsDto.DataSource, key)
+                .Inc(increment);
         }
     }
 }
