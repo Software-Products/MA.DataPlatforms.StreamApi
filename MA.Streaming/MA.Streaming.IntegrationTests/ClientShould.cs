@@ -37,19 +37,19 @@ public class ClientShould
 
     public ClientShould()
     {
-        var streamingApiConfiguration1 = Substitute.For<IStreamingApiConfiguration>();
+        var streamingApiConfiguration = Substitute.For<IStreamingApiConfiguration>();
         ILoggingDirectoryProvider loggingDirectoryProvider1 = new LoggingDirectoryProvider("");
-        streamingApiConfiguration1.BrokerUrl.Returns("localhost:9097");
-        streamingApiConfiguration1.StreamApiPort.Returns(5000);
-        streamingApiConfiguration1.IntegrateDataFormatManagement.Returns(false);
-        streamingApiConfiguration1.IntegrateSessionManagement.Returns(false);
-        streamingApiConfiguration1.StreamCreationStrategy.Returns(StreamCreationStrategy.PartitionBased);
-        streamingApiConfiguration1.StreamApiPort.Returns(ApiPortCreator.CreateNew());
-        streamingApiConfiguration1.Domain.Returns("ClientShouldDomain");
+        streamingApiConfiguration.BrokerUrl.Returns("localhost:9097");
+        streamingApiConfiguration.StreamApiPort.Returns(5000);
+        streamingApiConfiguration.IntegrateDataFormatManagement.Returns(false);
+        streamingApiConfiguration.IntegrateSessionManagement.Returns(false);
+        streamingApiConfiguration.StreamCreationStrategy.Returns(StreamCreationStrategy.PartitionBased);
+        streamingApiConfiguration.StreamApiPort.Returns(ApiPortCreator.CreateNew());
+        streamingApiConfiguration.Domain.Returns("ClientShouldDomain");
         this.kafkaChecker = Substitute.For<IKafkaBrokerAvailabilityChecker>();
-        this.kafkaChecker.Check(Arg.Any<string>()).Returns(true);
+        this.kafkaChecker.Check(Arg.Any<string>(),Arg.Any<ILogger?>()).Returns(true);
         this.streamingApiClient = StreamingApiClientFactory.Create(
-            streamingApiConfiguration1,
+            streamingApiConfiguration,
             CreateCancellationTokenSourceProvider(),
             this.kafkaChecker,
             loggingDirectoryProvider1);
@@ -192,7 +192,7 @@ public class ClientShould
     {
         // Arrange
         var initialisedEventCounter = 0;
-        this.kafkaChecker.Check(Arg.Any<string>()).Returns(false);
+        this.kafkaChecker.Check(Arg.Any<string>(),Arg.Any<ILogger?>()).Returns(false);
         var autoResetEvent = new AutoResetEvent(false);
         this.streamingApiClient.ServiceInitialised += (_, _) =>
         {

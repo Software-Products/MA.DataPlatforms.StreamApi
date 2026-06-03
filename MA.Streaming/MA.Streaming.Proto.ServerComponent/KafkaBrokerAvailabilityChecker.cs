@@ -17,6 +17,8 @@
 
 using Confluent.Kafka;
 
+using MA.Common;
+using MA.Common.Abstractions;
 using MA.Streaming.Abstraction;
 
 namespace MA.Streaming.Proto.ServerComponent;
@@ -24,66 +26,65 @@ namespace MA.Streaming.Proto.ServerComponent;
 public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
 {
     private const double TimeoutWaitingForMetadataSeconds = 2;
-    private const double TimeBetweenRetriesSeconds = 5;
+    private const double DefaultTimeBetweenRetriesSeconds = 5;
 
-    public bool Check(string brokerUrl)
+    private readonly Func<string, IAdminClient> adminClientFactory;
+    private readonly double timeBetweenRetriesSeconds;
+
+    public KafkaBrokerAvailabilityChecker()
+        : this(
+            brokerUrl => new AdminClientBuilder(new AdminClientConfig { BootstrapServers = brokerUrl }).Build())
     {
-        var config = new AdminClientConfig
-        {
-            BootstrapServers = brokerUrl,
-        };
-        using var adminClient = new AdminClientBuilder(config).Build();
+    }
 
+    internal KafkaBrokerAvailabilityChecker(Func<string, IAdminClient> adminClientFactory, double timeBetweenRetriesSeconds = DefaultTimeBetweenRetriesSeconds)
+    {
+        this.adminClientFactory = adminClientFactory;
+        this.timeBetweenRetriesSeconds = timeBetweenRetriesSeconds;
+    }
+
+    public bool Check(string brokerUrl, ILogger? logger = null)
+    {
+        logger ??= new ConsoleLogger();
+        using var adminClient = this.adminClientFactory(brokerUrl);
         var brokerAvailable = IsBrokerAvailable(adminClient);
 
         if (brokerAvailable)
         {
-            Console.WriteLine("Kafka broker is available. Proceeding with the rest of the code...");
+            logger.Info("Kafka broker is available. Proceeding with the rest of the code...");
         }
         else
         {
-            Console.WriteLine("Kafka broker is not available");
+            logger.Warning("Kafka broker is not available");
         }
 
         return brokerAvailable;
     }
 
-    public Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource)
+    public Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource, ILogger? logger = null)
     {
         return Task.Run(
             async () =>
             {
-                var config = new AdminClientConfig
-                {
-                    BootstrapServers = brokerUrl,
-                };
-                using var adminClient = new AdminClientBuilder(config).Build();
+                logger ??= new ConsoleLogger();
+                using var adminClient = this.adminClientFactory(brokerUrl);
+                var wasAvailable = IsBrokerAvailable(adminClient);
 
-                var kafkaAvailable = IsBrokerAvailable(adminClient);
                 while (!cancellationTokenSource.IsCancellationRequested)
                 {
-                    while (kafkaAvailable && !cancellationTokenSource.IsCancellationRequested)
-                    {
-                        if (!IsBrokerAvailable(adminClient))
-                        {
-                            kafkaAvailable = false;
-                            continue;
-                        }
+                    var isAvailable = IsBrokerAvailable(adminClient);
 
-                        await Task.Delay(TimeSpan.FromSeconds(TimeBetweenRetriesSeconds), cancellationTokenSource.Token);
+                    if (isAvailable && !wasAvailable)
+                    {
+                        logger.Info("Kafka broker is available again");
                     }
 
-                    while (!kafkaAvailable &&
-                           !cancellationTokenSource.IsCancellationRequested)
-                    {
-                        if (IsBrokerAvailable(adminClient))
-                        {
-                            Console.WriteLine("Kafka broker is available again");
-                            kafkaAvailable = true;
-                            continue;
-                        }
+                    var stateChanged = isAvailable != wasAvailable;
+                    wasAvailable = isAvailable;
 
-                        await Task.Delay(TimeSpan.FromSeconds(TimeBetweenRetriesSeconds), cancellationTokenSource.Token);
+                    if (!stateChanged && !cancellationTokenSource.IsCancellationRequested)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(this.timeBetweenRetriesSeconds), cancellationTokenSource.Token);
                     }
                 }
             },

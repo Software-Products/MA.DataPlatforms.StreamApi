@@ -857,7 +857,9 @@ public class TopicBasedPacketWriteAndBatchReadShould
         }
 
         var writeStream = packetWriter.WriteDataPackets();
-        var batchPublisher = new BatchPublisher(this.logger, writeStream);
+        using var tokenSource = new CancellationTokenSource();
+        var token = tokenSource.Token;
+        var batchPublisher = new BatchPublisher(this.logger, writeStream, token);
         var rnd = new Random();
         const int NumberOfMessages = 1_000_000;
         // The 3 is for the new session packets 
@@ -886,9 +888,7 @@ public class TopicBasedPacketWriteAndBatchReadShould
                 }
             );
         }
-
-        using var tokenSource = new CancellationTokenSource();
-        var token = tokenSource.Token;
+      
         var autoResetEvent = new AutoResetEvent(false);
         var receiveCount = 0;
         var receiverStopWatch = new Stopwatch();

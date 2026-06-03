@@ -20,6 +20,8 @@ using System.Security.Authentication;
 
 using Grpc.Net.Client;
 
+using MA.Common;
+using MA.Common.Abstractions;
 using MA.Streaming.API;
 
 namespace MA.Streaming.Proto.Client.Remote;
@@ -30,8 +32,9 @@ public static class RemoteStreamingApiClient
 
     public static bool Initialised { get; private set; }
 
-    public static void Initialise(string serverAddress)
+    public static void Initialise(string serverAddress, ILogger? logger = null)
     {
+        logger ??= new ConsoleLogger();
         if (Initialised)
         {
             return;
@@ -54,7 +57,7 @@ public static class RemoteStreamingApiClient
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            logger.Error(ex.ToString());
             throw;
         }
 

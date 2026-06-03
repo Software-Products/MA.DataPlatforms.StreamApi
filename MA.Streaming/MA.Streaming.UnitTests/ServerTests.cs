@@ -166,13 +166,56 @@ public class ServerTests
             grpcMaxSendMessageSize: GrpcMaxSendMessageSize,
             grpcMaxReceiveMessageSize: GrpcMaxReceiveMessageSize);
 
+
         // Assert
         Assert.NotNull(server);
         logger.DidNotReceive().Warning(Arg.Any<string>());
         logger.DidNotReceive().Info(Arg.Any<string>());
     }
 
-    private static StreamingApiConfiguration CreateStreamingApiConfiguration(int batchingSizesKb)
+    [Fact]
+    public async Task ValidateStreamApiConfiguration_WhenGrpcReflectionIsEnabled_ItTurnsOnAndMapGrpcReflection()
+    {
+        // Arrange
+        var logger = Substitute.For<ILogger>();
+        var streamingApiConfiguration = CreateStreamingApiConfiguration(batchingSizesKb: 1024, enableGrpcReflection: true); // 1 MB
+        var cancellationTokenSourceProvider = Substitute.For<ICancellationTokenSourceProvider>();
+        var kafkaBrokerAvailabilityChecker = Substitute.For<IKafkaBrokerAvailabilityChecker>();
+        var loggingDirectoryProvider = Substitute.For<ILoggingDirectoryProvider>();
+        const int GrpcMaxSendMessageSize = 4 * 1024 * 1024; // 4 MB
+        const int GrpcMaxReceiveMessageSize = 4 * 1024 * 1024; // 4 MB
+
+        // Act
+        var server = new Server(
+            streamingApiConfiguration,
+            cancellationTokenSourceProvider,
+            kafkaBrokerAvailabilityChecker,
+            loggingDirectoryProvider,
+            logger: logger,
+            grpcMaxSendMessageSize: GrpcMaxSendMessageSize,
+            grpcMaxReceiveMessageSize: GrpcMaxReceiveMessageSize);
+        var cancellationTokenSource = new CancellationTokenSource();
+        try
+        {
+            await cancellationTokenSource.CancelAsync();
+            await server.StartAsync(cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Do Nothing.
+        }
+
+        // Assert
+        Assert.NotNull(server);
+        logger.DidNotReceive().Warning(Arg.Any<string>());
+        logger.Received().Info(Arg.Is<string>(x => x == "gRPC Reflection Enabled."));
+        logger.Received().Info(Arg.Is<string>(x => x == "gRPC Reflection Mapped."));
+
+        // Cleanup
+        cancellationTokenSource.Dispose();
+    }
+
+    private static StreamingApiConfiguration CreateStreamingApiConfiguration(int batchingSizesKb, bool enableGrpcReflection = false)
     {
         return new StreamingApiConfiguration(
             streamCreationStrategy: StreamCreationStrategy.TopicBased,
@@ -188,6 +231,7 @@ public class ServerTests
             terminationTimeoutSeconds: 1,
             domain: "test",
             batchingSizesKb: batchingSizesKb,
-            batchingTimeMs: 100);
+            batchingTimeMs: 100,
+            enableGrpcReflection: enableGrpcReflection);
     }
 }

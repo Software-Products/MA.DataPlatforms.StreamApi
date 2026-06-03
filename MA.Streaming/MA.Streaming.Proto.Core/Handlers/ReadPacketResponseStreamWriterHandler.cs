@@ -55,7 +55,15 @@ public class ReadPacketResponseStreamWriterHandler : ReadPacketResponseStreamWri
 
     public override async Task ConsumeAsync(ReadPacketsResponse data)
     {
-        await this.responseStream.WriteAsync(data, this.Context.CancellationToken);
+        try
+        {
+            await this.responseStream.WriteAsync(data, this.Context.CancellationToken);
+        }
+        catch (Exception ex)
+        {
+            this.StopHandling();
+            this.Logger.Error($"Exception writing to stream for connection {this.ConnectionId}: {ex.Message}");
+        }
     }
 
     protected internal override async Task WriteDataToStreamActionAsync(IReadOnlyList<PacketReceivedInfoEventArgs> receivedItems)

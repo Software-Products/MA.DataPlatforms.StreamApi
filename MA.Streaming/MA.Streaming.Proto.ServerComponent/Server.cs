@@ -187,6 +187,7 @@ public sealed class Server : IServer
         if (this.streamingApiConfiguration.EnableGrpcReflection)
         {
             builder.Services.AddGrpcReflection();
+            this.logger?.Info("gRPC Reflection Enabled.");
         }
 
         new ServiceConfigurator(
@@ -212,6 +213,7 @@ public sealed class Server : IServer
         if (this.streamingApiConfiguration.EnableGrpcReflection)
         {
             this.webApp.MapGrpcReflectionService();
+            this.logger?.Info("gRPC Reflection Mapped.");
         }
 
         var loggerService = this.webApp.Services.GetService<ILogger>();
@@ -221,7 +223,7 @@ public sealed class Server : IServer
         while (!kafkaAvailable &&
                !cancellationToken.IsCancellationRequested)
         {
-            if (this.kafkaBrokerAvailabilityChecker.Check(this.streamingApiConfiguration.BrokerUrl))
+            if (this.kafkaBrokerAvailabilityChecker.Check(this.streamingApiConfiguration.BrokerUrl, loggerService))
             {
                 kafkaAvailable = true;
                 continue;

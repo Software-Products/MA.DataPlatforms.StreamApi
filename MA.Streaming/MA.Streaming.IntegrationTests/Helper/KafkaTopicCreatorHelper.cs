@@ -49,6 +49,12 @@ internal class KafkaTopicCreatorHelper
                 }
             ]).Wait();
         }
+        catch (AggregateException ex)
+            when (ex.InnerExceptions.OfType<CreateTopicsException>()
+                    .All(e => e.Results.All(r => r.Error.Code == ErrorCode.TopicAlreadyExists)))
+        {
+            // Topic already exists from a previous test run — this is not an error.
+        }
         catch (Exception ex)
         {
             Console.WriteLine(ex.ToString());

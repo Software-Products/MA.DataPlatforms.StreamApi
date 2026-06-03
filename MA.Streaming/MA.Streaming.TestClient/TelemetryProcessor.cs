@@ -15,12 +15,15 @@
 // limitations under the License.
 // </copyright>
 
+using System.Diagnostics.CodeAnalysis;
+
 using Google.Protobuf;
+
+using Grpc.Core;
 
 using MA.Streaming.API;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Local;
-using System.Diagnostics.CodeAnalysis;
 
 namespace MA.Streaming.TestClient;
 
@@ -84,13 +87,29 @@ public class TelemetryProcessor
 
         var stream = this.packetReader.ReadPackets(readRequest, cancellationToken: cancellationToken);
 
-        while (await stream.ResponseStream.MoveNext(cancellationToken))
+        try
         {
-            var response = stream.ResponseStream.Current;
-            foreach (var data in response.Response)
+            while (await stream.ResponseStream.MoveNext(cancellationToken))
             {
-                await this.ProcessTelemetryPacket(data.Packet);
+                var response = stream.ResponseStream.Current;
+                foreach (var data in response.Response)
+                {
+                    await this.ProcessTelemetryPacket(data.Packet);
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown — cancellationToken was cancelled.
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
+        {
+            // gRPC wraps cancellation as RpcException(Cancelled) when the token
+            // fires inside MoveNext — treat it the same as OperationCanceledException.
+        }
+        finally
+        {
+            stream.Dispose();
         }
     }
 
@@ -141,12 +160,14 @@ public class TelemetryProcessor
             var parameterId = parameterIds[columnIndex];
             var column = periodicData.Columns[columnIndex];
 
-            if (column.DoubleSamples != null)
+            if (column.DoubleSamples == null)
             {
-                foreach (var sample in column.DoubleSamples.Samples)
-                {
-                    await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
-                }
+                continue;
+            }
+
+            foreach (var sample in column.DoubleSamples.Samples)
+            {
+                await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
             }
         }
     }
@@ -155,19 +176,14 @@ public class TelemetryProcessor
     {
         var parameterIds = rowData.DataFormat.ParameterIdentifiers?.ParameterIdentifiers ?? [];
 
-        for (var rowIndex = 0; rowIndex < rowData.Rows.Count; rowIndex++)
+        foreach (var rowDoubleSampleList in rowData.Rows.Select(row => row.DoubleSamples.Samples))
         {
-            var row = rowData.Rows[rowIndex];
-
-            if (row.DoubleSamples != null)
+            for (var sampleIndex = 0; sampleIndex < rowDoubleSampleList.Count && sampleIndex < parameterIds.Count; sampleIndex++)
             {
-                for (var sampleIndex = 0; sampleIndex < row.DoubleSamples.Samples.Count && sampleIndex < parameterIds.Count; sampleIndex++)
-                {
-                    var parameterId = parameterIds[sampleIndex];
-                    var sample = row.DoubleSamples.Samples[sampleIndex];
+                var parameterId = parameterIds[sampleIndex];
+                var sample = rowDoubleSampleList[sampleIndex];
 
-                    await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
-                }
+                await this.ProcessParameterValue(parameterId, sample.Value, sample.Status);
             }
         }
     }

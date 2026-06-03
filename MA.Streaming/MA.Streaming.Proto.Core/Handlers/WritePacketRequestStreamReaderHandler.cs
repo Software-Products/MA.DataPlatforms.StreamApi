@@ -85,7 +85,7 @@ public class WritePacketRequestStreamReaderHandler : IWritePacketRequestStreamRe
 
                 Task.Delay(5).ConfigureAwait(false).GetAwaiter().GetResult();
             }
-        });
+        }, this.context.CancellationToken);
 
         this.autoResetEvent.WaitOne();
     }

@@ -946,7 +946,8 @@ public class PartitionBasedPacketWriteAndBatchReadShould
         }
 
         var writeStream = packetWriter.WriteDataPackets();
-        var batchPublisher = new BatchPublisher(this.logger, writeStream);
+        using var tokenSource = new CancellationTokenSource();
+        var batchPublisher = new BatchPublisher(this.logger, writeStream, tokenSource.Token);
         var rnd = new Random();
         const int NumberOfMessages = 1_000_000;
         // The 3 is for the new session packets 
@@ -976,7 +977,7 @@ public class PartitionBasedPacketWriteAndBatchReadShould
             );
         }
 
-        using var tokenSource = new CancellationTokenSource();
+        
         var token = tokenSource.Token;
         var autoResetEvent = new AutoResetEvent(false);
         var receiveCount = 0;

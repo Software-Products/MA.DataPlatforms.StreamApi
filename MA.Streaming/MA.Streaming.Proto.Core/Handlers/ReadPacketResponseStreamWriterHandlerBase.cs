@@ -38,6 +38,8 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
     internal readonly SizeBasedBatchProcessor<PacketReceivedInfoEventArgs>? TimeWindowBatchProcessor;
     internal readonly GenericBuffer<T> WritingBuffer;
     internal bool Started;
+    private readonly CancellationToken cancellationToken;
+    private int stoppedFlag;
 
     protected ReadPacketResponseStreamWriterHandlerBase(
         ConnectionDetailsDto connectionDetailsDto,
@@ -57,6 +59,7 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
         this.ConnectionId = connectionDetailsDto.Id;
         this.ConnectorService.PacketReceived += this.ConnectorService_PacketReceived;
         var config = streamingApiConfigurationProvider.Provide();
+        this.cancellationToken = context.CancellationToken;
         if (batchingResponses)
         {
             this.TimeWindowBatchProcessor =
@@ -64,12 +67,12 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
                     logger,
                     this.WriteDataToStreamActionAsync,
                     PacketReceivedInfoSizeCalculator.CalculateSize,
-                    new CancellationTokenSource(),
+                    this.cancellationToken,
                     maxBatchSizeBytes: config.BatchingSizesKb * 1024,
                     timeWindowMilliseconds: config.BatchingTimeMs);
         }
 
-        this.WritingBuffer = new GenericBuffer<T>(this);
+        this.WritingBuffer = new GenericBuffer<T>(this, this.cancellationToken, logger);
     }
 
     public event EventHandler<DateTime>? HandlingStopped;
@@ -90,13 +93,21 @@ public abstract class ReadPacketResponseStreamWriterHandlerBase<T> : IBufferCons
             {
                 this.ConnectorService.Start();
             },
-            this.Context.CancellationToken);
+            this.cancellationToken);
+
         this.Started = true;
+        using var registration = this.cancellationToken.Register(this.StopHandling);
         this.AutoResetEvent.WaitOne();
     }
 
     public void StopHandling()
     {
+        if (Interlocked.Exchange(ref this.stoppedFlag, 1) == 1)
+        {
+            return;
+        }
+
+        this.ConnectorService.PacketReceived -= this.ConnectorService_PacketReceived;
         this.ConnectorService.Stop();
         this.AutoResetEvent.Set();
         this.HandlingStopped?.Invoke(this, DateTime.Now);

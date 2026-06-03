@@ -10,6 +10,7 @@
 		<Description>Core libraries for the MA Stream API.</Description>
 		<Authors>Motion Applied</Authors>
 		<RepositoryUrl>https://github.com/mat-docs/packages</RepositoryUrl>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
 
 	<ItemGroup>

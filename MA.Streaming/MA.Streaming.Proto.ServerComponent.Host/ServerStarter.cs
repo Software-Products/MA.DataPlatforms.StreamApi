@@ -15,6 +15,8 @@
 // limitations under the License.
 // </copyright>
 
+using System.Diagnostics.CodeAnalysis;
+
 using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
 using MA.Streaming.Core.Routing;
@@ -25,6 +27,7 @@ using Serilog;
 
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
+[ExcludeFromCodeCoverage] // This class is responsible for starting the Stream API server. It ensures that the server is only started once and handles the configuration and logging setup.
 internal static class ServerStarter
 {
     private static bool started;
@@ -85,27 +88,30 @@ internal static class ServerStarter
                     hostConfig.BatchingTimeMs,
                     hostConfig.EnableGrpcReflection);
 
+                var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
                 var server = new Server(
                     streamApiConfig,
-                    new CancellationTokenSourceProvider(),
+                    cancellationTokenSourceProvider,
                     new KafkaBrokerAvailabilityChecker(),
                     new LoggingDirectoryProvider(""),
                     logger: logger,
                     grpcMaxReceiveMessageSize: grpConfiguration?.MaxReceiveMessageSize,
                     grpcMaxSendMessageSize: grpConfiguration?.MaxReceiveMessageSize);
 
-                _ = Task.Run(async () =>
-                {
-                    try
+                _ = Task.Run(
+                    async () =>
                     {
-                        await server.Start();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.ToString());
-                        Environment.Exit(-1);
-                    }
-                });
+                        try
+                        {
+                            await server.Start();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.ToString());
+                            Environment.Exit(-1);
+                        }
+                    },
+                    cancellationTokenSourceProvider.Provide().Token);
 
                 Console.WriteLine($"Stream Api Server Started on port {streamApiConfig.StreamApiPort}...");
                 started = true;

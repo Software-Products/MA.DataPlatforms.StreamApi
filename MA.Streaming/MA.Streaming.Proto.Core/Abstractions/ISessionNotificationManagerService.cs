@@ -21,11 +21,31 @@ using MA.Streaming.API;
 
 namespace MA.Streaming.Proto.Core.Abstractions;
 
+/// <summary>
+/// Manages session start and stop notification streams for data sources.
+/// </summary>
 public interface ISessionNotificationManagerService
 {
+    /// <summary>
+    /// Starts the session notification manager service.
+    /// </summary>
     void Start();
 
-    Task AddStartNotificationStream(string dataSource, IServerStreamWriter<GetSessionStartNotificationResponse> notificationStreamWriter);
+    /// <summary>
+    /// Adds a stream writer for session start notifications.
+    /// </summary>
+    /// <param name="dataSource">The data source to monitor for session start events.</param>
+    /// <param name="notificationStreamWriter">The server stream writer to send start notifications to.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task AddStartNotificationStream(string dataSource, IServerStreamWriter<GetSessionStartNotificationResponse> notificationStreamWriter, CancellationToken cancellationToken = default);
 
-    Task AddStopNotificationStream(string dataSource, IServerStreamWriter<GetSessionStopNotificationResponse> notificationStreamWriter);
+    /// <summary>
+    /// Adds a stream writer for session stop notifications.
+    /// </summary>
+    /// <param name="dataSource">The data source to monitor for session stop events.</param>
+    /// <param name="notificationStreamWriter">The server stream writer to send stop notifications to.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task AddStopNotificationStream(string dataSource, IServerStreamWriter<GetSessionStopNotificationResponse> notificationStreamWriter, CancellationToken cancellationToken = default);
 }

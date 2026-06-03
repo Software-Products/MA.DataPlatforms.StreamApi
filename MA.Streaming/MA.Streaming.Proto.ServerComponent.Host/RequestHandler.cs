@@ -15,6 +15,7 @@
 // limitations under the License.
 // </copyright>
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +26,7 @@ using MA.Streaming.Core.Routing;
 
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
+[ExcludeFromCodeCoverage]
 internal static class RequestHandler
 {
     private static bool started;
@@ -86,8 +88,9 @@ internal static class RequestHandler
                     return;
                 }
 
-                var server = new Server(config, new CancellationTokenSourceProvider(), new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
-                _ = Task.Run(async () => await server.Start());
+                var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
+                var server = new Server(config, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
+                _ = Task.Run(async () => await server.Start(), cancellationTokenSourceProvider.Provide().Token);
 
                 Console.WriteLine($"Stream Api Server Started on port {config.StreamApiPort}...");
                 SendSuccessMessage(response, config);

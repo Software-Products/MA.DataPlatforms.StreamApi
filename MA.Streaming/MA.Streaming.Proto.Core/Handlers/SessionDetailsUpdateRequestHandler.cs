@@ -35,6 +35,7 @@ public class SessionDetailsUpdateRequestHandler : ISessionDetailsUpdateRequestHa
     private readonly IPacketWriterHelper packetWriterHelper;
     private readonly ITypeNameProvider typeNameProvider;
     private readonly ISessionInfoService sessionInfoService;
+    private readonly object sessionDetailUpdateLock = new();
 
     public SessionDetailsUpdateRequestHandler(
         IInMemoryRepository<string, SessionDetailRecord> sessionInfoRepository,
@@ -52,36 +53,39 @@ public class SessionDetailsUpdateRequestHandler : ISessionDetailsUpdateRequestHa
 
     public UpdateSessionDetailsResponse UpdateSessionDetails(UpdateSessionDetailsRequest request)
     {
-        var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
-        if (foundSessionDetail == null)
+        lock (this.sessionDetailUpdateLock)
         {
-            this.logger.Error(
-                $"Unable to update session details for a session which is not currently registered with the session management service. session key: {request.SessionKey}");
-            return CreateUnsuccessfulResponse();
+            var foundSessionDetail = this.sessionInfoRepository.Get(request.SessionKey);
+            if (foundSessionDetail == null)
+            {
+                this.logger.Error(
+                    $"Unable to update session details for a session which is not currently registered with the session management service. session key: {request.SessionKey}");
+                return CreateUnsuccessfulResponse();
+            }
+
+            var sessionInfo = CreatePacket(request, foundSessionDetail);
+
+            var res = this.sessionInfoService.UpdateSessionInfo(
+                request.SessionKey,
+                new SessionInfoPacketDto(
+                    sessionInfo.Type,
+                    sessionInfo.Version,
+                    sessionInfo.Identifier,
+                    sessionInfo.AssociateSessionKeys,
+                    sessionInfo.Details,
+                    sessionInfo.UtcOffset.ToTimeSpan(),
+                    sessionInfo.CreationTime.ToDateTime(),
+                    sessionInfo.TerminationTime.ToDateTime()));
+
+            if (!res.Success)
+            {
+                return CreateUnsuccessfulResponse();
+            }
+
+            this.WritePacket(request, sessionInfo, foundSessionDetail);
+
+            return CreateSuccessfulResponse();
         }
-
-        var sessionInfo = CreatePacket(request, foundSessionDetail);
-
-        var res = this.sessionInfoService.UpdateSessionInfo(
-            request.SessionKey,
-            new SessionInfoPacketDto(
-                sessionInfo.Type,
-                sessionInfo.Version,
-                sessionInfo.Identifier,
-                sessionInfo.AssociateSessionKeys,
-                sessionInfo.Details,
-                sessionInfo.UtcOffset.ToTimeSpan(),
-                sessionInfo.CreationTime.ToDateTime(),
-                sessionInfo.TerminationTime.ToDateTime()));
-
-        if (!res.Success)
-        {
-            return CreateUnsuccessfulResponse();
-        }
-
-        this.WritePacket(request, sessionInfo, foundSessionDetail);
-
-        return CreateSuccessfulResponse();
     }
 
     private static UpdateSessionDetailsResponse CreateSuccessfulResponse()

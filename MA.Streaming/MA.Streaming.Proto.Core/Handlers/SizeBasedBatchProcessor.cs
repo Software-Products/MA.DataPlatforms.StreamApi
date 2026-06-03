@@ -33,8 +33,9 @@ public class SizeBasedBatchProcessor<T>
     private readonly int maxBatchSizeBytes;
     private readonly int batchSizeThresholdBytes;
     private readonly Timer timer;
-    private readonly CancellationTokenSource cancellationTokenSource;
+    private readonly CancellationToken cancellationToken;
     private readonly AutoResetEvent timerSignal = new(false);
+    private bool completed;
 
     private const int DefaultMaxBatchSizeBytes = 3 * 1024 * 1024;
     private const double DefaultThresholdPercentage = 0.70;
@@ -43,11 +44,12 @@ public class SizeBasedBatchProcessor<T>
         ILogger logger,
         Func<IReadOnlyList<T>, Task> processAction,
         Func<T, int> sizeCalculator,
-        CancellationTokenSource cancellationTokenSource,
+        CancellationToken cancellationToken,
         int maxBatchSizeBytes = DefaultMaxBatchSizeBytes,
         double thresholdPercentage = DefaultThresholdPercentage,
         int timeWindowMilliseconds = 50)
     {
+        this.cancellationToken = cancellationToken;
         if (thresholdPercentage is <= 0 or > 1)
         {
             throw new ArgumentException("Threshold percentage must be between 0 and 1", nameof(thresholdPercentage));
@@ -56,7 +58,6 @@ public class SizeBasedBatchProcessor<T>
         this.logger = logger;
         this.processAction = processAction ?? throw new ArgumentNullException(nameof(processAction));
         this.sizeCalculator = sizeCalculator ?? throw new ArgumentNullException(nameof(sizeCalculator));
-        this.cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
         this.maxBatchSizeBytes = maxBatchSizeBytes;
         this.batchSizeThresholdBytes = (int)(maxBatchSizeBytes * thresholdPercentage);
 
@@ -64,7 +65,7 @@ public class SizeBasedBatchProcessor<T>
         this.timer.AutoReset = false;
         this.timer.Elapsed += this.Timer_Elapsed;
 
-        _ = Task.Run(() => this.ProcessMessagesAsync(cancellationTokenSource.Token), cancellationTokenSource.Token);
+        _ = Task.Run(this.ProcessMessagesAsync);
     }
 
     public void Add(T item)
@@ -90,15 +91,15 @@ public class SizeBasedBatchProcessor<T>
         this.timerSignal.Set();
     }
 
-    private async Task ProcessMessagesAsync(CancellationToken token)
+    private async Task ProcessMessagesAsync()
     {
         var messages = new List<T>();
         var currentBatchSizeBytes = 0;
         var isTimerRunning = false;
 
-        while (!token.IsCancellationRequested)
+        while (!this.cancellationToken.IsCancellationRequested && !this.completed)
         {
-            var hasMessage = this.messageQueue.TryTake(out var message, 100, token);
+            var hasMessage = this.messageQueue.TryTake(out var message, 100);
 
             if (hasMessage && !EqualityComparer<T>.Default.Equals(message, default))
             {
@@ -205,9 +206,7 @@ public class SizeBasedBatchProcessor<T>
             await Task.Delay(100);
         }
 
-        await Task.Delay(200);
-        await this.cancellationTokenSource.CancelAsync();
-        await Task.Delay(100);
+        this.completed = true;
     }
 
     public int QueueCount => this.messageQueue.Count;
