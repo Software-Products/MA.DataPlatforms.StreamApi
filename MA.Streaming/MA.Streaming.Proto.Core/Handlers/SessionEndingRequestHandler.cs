@@ -158,10 +158,13 @@ public class SessionEndingRequestHandler : ISessionEndingRequestHandler
 
     private static void WaitForTheWritingToFinish(ISessionPacketWritingLog sessionWritingLog)
     {
-        Task.Delay(1000).Wait();
-        while (DateTime.Now - sessionWritingLog.GetWhenLastUpdated() < TimeSpan.FromSeconds(1))
+        Task.Run(() =>
         {
             Task.Delay(1000).Wait();
-        }
+            while (DateTime.UtcNow - sessionWritingLog.GetWhenLastUpdated() < TimeSpan.FromSeconds(1))
+            {
+                Task.Delay(1000).Wait();
+            }
+        });
     }
-}
+}   

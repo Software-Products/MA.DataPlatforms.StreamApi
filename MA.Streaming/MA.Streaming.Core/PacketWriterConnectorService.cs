@@ -20,7 +20,6 @@ using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.PrometheusMetrics;
 
 namespace MA.Streaming.Core;
@@ -44,16 +43,18 @@ public class PacketWriterConnectorService : IPacketWriterConnectorService, IBuff
         ISessionPacketWritingLogProvider sessionPacketWritingLogProvider,
         ITypeNameProvider typeNameProvider,
         IStreamStopPacketWriterTracker streamStopPacketWriterTracker,
-        ILogger apiLogger)
+        ILogger apiLogger,
+        ICancellationTokenSourceProvider cancellationTokenSourceProvider)
     {
+        var token = cancellationTokenSourceProvider.Provide().Token;
         this.routerProvider = routerProvider;
         this.dataSourceRoutingInfoTracker = dataSourceRoutingInfoTracker;
         this.sessionStreamRoutingTracker = sessionStreamRoutingTracker;
         this.sessionPacketWritingLogProvider = sessionPacketWritingLogProvider;
         this.streamStopPacketWriterTracker = streamStopPacketWriterTracker;
-        this.dataBuffer = new GenericBuffer<WriteDataPacketRequestDto>(this, new CancellationTokenSourceProvider());
-        this.infoBuffer = new GenericBuffer<WriteInfoPacketRequestDto>(this, new CancellationTokenSourceProvider());
         this.apiLogger = apiLogger;
+        this.dataBuffer = new GenericBuffer<WriteDataPacketRequestDto>(this, token, apiLogger);
+        this.infoBuffer = new GenericBuffer<WriteInfoPacketRequestDto>(this, token, apiLogger);
         this.streamStoppedType = typeNameProvider.StreamStoppedPacketTypeName;
     }
 

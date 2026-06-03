@@ -53,6 +53,8 @@ public class SessionInfoServiceShould
     private readonly ThreadSafeInMemoryRepository<string, SessionDetailRecord> memoryRepository;
     private readonly TypeNameProvider typeNameProvider;
     private readonly string sessionInfoTopicName;
+    private readonly string mainTopicName;
+    private readonly string essentialTopicName;
 
 
     public SessionInfoServiceShould(ITestOutputHelper outputHelper)
@@ -104,6 +106,8 @@ public class SessionInfoServiceShould
             datasourceRepository);
 
         this.sessionInfoTopicName = kafkaRouteInfoCreator.CreateSessionInfoRouteInfo().KafkaRouteTopicInfo.Topic;
+        this.mainTopicName = kafkaRouteInfoCreator.CreateMainRouteInfo("Session_Info_Test_Datasource").KafkaRouteTopicInfo.Topic;
+        this.essentialTopicName = kafkaRouteInfoCreator.CreateEssentialRouteInfo("Session_Info_Test_Datasource").KafkaRouteTopicInfo.Topic;
     }
 
     [Fact]
@@ -166,11 +170,13 @@ public class SessionInfoServiceShould
 
         const string DataSource = "Session_Info_Test_Datasource";
         MetricProviders.NumberOfSessions.WithLabels(DataSource).Set(0);
+        const long ExpectedMainOffset = 55L;
+        const long ExpectedEssentialOffset = 77L;
         var mapField = new MapField<string, long>
         {
-            {
-                $"{DataSource}:{0}", 10
-            }
+            { $"{DataSource}:{0}", 10 },
+            { $"{this.mainTopicName}:{0}", ExpectedMainOffset },
+            { $"{this.essentialTopicName}:{0}", ExpectedEssentialOffset }
         };
         var sessionKey = Guid.NewGuid().ToString();
         var newSessionPacket = new NewSessionPacket
@@ -264,10 +270,16 @@ public class SessionInfoServiceShould
         sessions.Count.Should().Be(1);
         sessions[0].SessionKey.Should().Be(sessionKey);
         sessions[0].Completed.Should().BeTrue();
-        sessions[0].StartingOffsetInfo.Count.Should().Be(1);
+        sessions[0].StartingOffsetInfo.Count.Should().Be(3);
         sessions[0].StartingOffsetInfo[0].TopicName.Should().Be(DataSource);
         sessions[0].StartingOffsetInfo[0].Partition.Should().Be(0);
         sessions[0].StartingOffsetInfo[0].Offset.Should().Be(10);
+        sessions[0].MainOffset.Should().Be(
+            ExpectedMainOffset,
+            "MainOffset must be resolved via the main topic name produced by kafkaRouteInfoCreator.CreateMainRouteInfo(), not the raw DataSource string");
+        sessions[0].EssentialOffset.Should().Be(
+            ExpectedEssentialOffset,
+            "EssentialOffset must be resolved via the essential topic name produced by kafkaRouteInfoCreator.CreateEssentialRouteInfo()");
         sessions[0].SessionInfoPacket.Identifier.Should().Be(NewIdentifier);
         sessions[0].SessionInfoPacket.AssociatedKeys.Should().BeEquivalentTo(
             new List<string>

@@ -1,26 +1,19 @@
 {
   "StreamApiConfig": {
     "StreamCreationStrategy": 1,
-    "BrokerUrl": "localhost:9094",
+    "BrokerUrl": "kafka:9092",
     "PartitionMappings": [
-      {
-        "Stream": "Stream1",
-        "Partition": 1
-      },
-      {
-        "Stream": "Stream2",
-        "Partition": 2
-      }
+      {}
     ],
     "IntegrateSessionManagement": true,
     "IntegrateDataFormatManagement": true,
     "UseRemoteKeyGenerator": false,
     "RemoteKeyGeneratorServiceAddress": "",
-    "BatchingResponses": false,
-    "StreamApiPort": 13579,
-    "Domain": "DefaultDomain",
-    "InitialisationTimeoutSeconds": 5,
-    "TerminationTimeoutSeconds": 5
+    "BatchingResponses": true
+  },
+
+  "MonitorConfig": {
+    "DataSource": "Default"
   },
 
   "Serilog": {

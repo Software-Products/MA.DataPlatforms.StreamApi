@@ -1,0 +1,28 @@
+{
+  "profiles": {
+    "Default (Producer + Processor)": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    },
+    "Default + verbose logs": {
+      "commandName": "Project",
+      "commandLineArgs": "--verbose"
+    },
+    "Live Session Monitor": {
+      "commandName": "Project",
+      "commandLineArgs": "--monitor"
+    },
+    "Live Session Monitor (override data-source)": {
+      "commandName": "Project",
+      "commandLineArgs": "--monitor --data-source vehicle-001"
+    },
+    "Thread-Leak Scenario (3 sessions, 60s)": {
+      "commandName": "Project",
+      "commandLineArgs": "--thread-leak --sessions 3 --duration-seconds 60"
+    },
+    "Thread-Leak Scenario (5 sessions, 30s)": {
+      "commandName": "Project",
+      "commandLineArgs": "--thread-leak --sessions 5 --duration-seconds 30"
+    }
+  }
+}

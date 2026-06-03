@@ -40,6 +40,7 @@ public class SessionInfoService : ISessionInfoService
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IDataSourcesRepository dataSourcesRepository;
     private readonly IDtoFromByteFactory<SessionInfoPacketDto> sessionInfoDtoFromByteFactory;
+    private readonly object sessionUpdateLock = new();
 
     private readonly string newSessionPacketTypeName;
 
@@ -99,8 +100,10 @@ public class SessionInfoService : ISessionInfoService
     {
         try
         {
+            var mainRouteInfo = this.kafkaRouteInfoCreator.CreateMainRouteInfo(newSessionPacket.DataSource);
             var essentialRouteInfo = this.kafkaRouteInfoCreator.CreateEssentialRouteInfo(newSessionPacket.DataSource);
-            var mainOffset = newSessionPacket.TopicOffsetsPartitions.FirstOrDefault(i => i.TopicName == newSessionPacket.DataSource && i.Partition == 0)?.Offset ?? 0;
+            var mainOffset = newSessionPacket.TopicOffsetsPartitions
+                .FirstOrDefault(i => i.TopicName == mainRouteInfo.KafkaRouteTopicInfo.Topic && i.Partition == 0)?.Offset ?? 0;
             var essentialOffset = newSessionPacket.TopicOffsetsPartitions
                 .FirstOrDefault(i => i.TopicName == essentialRouteInfo.KafkaRouteTopicInfo.Topic && i.Partition == 0)?.Offset ?? 0;
 
@@ -194,21 +197,24 @@ public class SessionInfoService : ISessionInfoService
 
     public (bool Success, string Message) UpdateSessionInfo(string sessionKey, SessionInfoPacketDto sessionInfo)
     {
-        try
+        lock (this.sessionUpdateLock)
         {
-            var foundItem = this.sessionInfoRepository.Get(sessionKey);
-            if (foundItem is null)
+            try
             {
-                this.logger.Error($"try to update the session that is not inserted before key:{sessionKey}");
-                return (false, "the session with that key not found to update");
-            }
+                var foundItem = this.sessionInfoRepository.Get(sessionKey);
+                if (foundItem is null)
+                {
+                    this.logger.Error($"try to update the session that is not inserted before key:{sessionKey}");
+                    return (false, "the session with that key not found to update");
+                }
 
-            this.UpdateSessionInfo(foundItem, sessionInfo);
-            return (true, "ok");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"exception happened during session ending: {ex}");
+                this.UpdateSessionInfo(foundItem, sessionInfo);
+                return (true, "ok");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"exception happened during session ending: {ex}");
+            }
         }
     }
 

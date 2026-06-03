@@ -26,22 +26,22 @@ namespace MA.Streaming.IntegrationTests;
 internal class BatchPublisher
 {
     private readonly AsyncClientStreamingCall<WriteDataPacketsRequest, WriteDataPacketsResponse> streamWriter;
+    private readonly CancellationToken cancellationToken;
     private readonly SizeBasedBatchProcessor<DataPacketDetails> sizeBatcher;
-    private readonly CancellationTokenSource cancellationTokenSource;
     private int inputCounter;
     private bool finished;
     private int outputCounter;
 
     public event EventHandler<DateTime>? DataPacketPublishCompleted;
 
-    public BatchPublisher(ILogger logger, AsyncClientStreamingCall<WriteDataPacketsRequest, WriteDataPacketsResponse> streamWriter)
+    public BatchPublisher(ILogger logger, AsyncClientStreamingCall<WriteDataPacketsRequest, WriteDataPacketsResponse> streamWriter, CancellationToken cancellationToken)
     {
         this.streamWriter = streamWriter;
-        this.cancellationTokenSource = new CancellationTokenSource();
+        this.cancellationToken = cancellationToken;
         this.sizeBatcher = new SizeBasedBatchProcessor<DataPacketDetails>(logger,
             this.SendData,
             SizeCalculation,
-            this.cancellationTokenSource,
+            cancellationToken,
             maxBatchSizeBytes: 4 * 1024 * 1024);
     }
 
@@ -66,7 +66,7 @@ internal class BatchPublisher
                 arg
             }
         };
-        await this.streamWriter.RequestStream.WriteAsync(request, this.cancellationTokenSource.Token);
+        await this.streamWriter.RequestStream.WriteAsync(request, this.cancellationToken);
         if (this.finished &&
             this.outputCounter == this.inputCounter)
         {
@@ -77,5 +77,6 @@ internal class BatchPublisher
     public void Finish()
     {
         this.finished = true;
+        this.sizeBatcher.CompleteAsync().Wait(this.cancellationToken);
     }
 }

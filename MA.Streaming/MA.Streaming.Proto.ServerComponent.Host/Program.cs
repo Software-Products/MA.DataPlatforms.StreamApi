@@ -15,14 +15,18 @@
 // limitations under the License.
 // </copyright>
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 
 using Prometheus;
 
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
+[ExcludeFromCodeCoverage]
 internal static class Program
 {
+    private static readonly CancellationTokenSource CancellationTokenSource = new();
+
     private static void Main()
     {
         var autoResetEvent = new AutoResetEvent(false);
@@ -34,6 +38,8 @@ internal static class Program
             Console.WriteLine("Stopping the application gracefully...");
             autoResetEvent.Set();
             Environment.Exit(0);
+            CancellationTokenSource.Cancel();
+            CancellationTokenSource.Dispose();
         };
         Console.WriteLine("Press Ctrl+C to stop the application.");
 
@@ -46,16 +52,18 @@ internal static class Program
 
             Console.WriteLine("Listening for requests...");
 
-            _ = Task.Run(async () =>
-            {
-                while (true)
+            _ = Task.Run(
+                async () =>
                 {
-                    var context = await listener.GetContextAsync();
-                    var request = context.Request;
-                    var response = context.Response;
-                    await RequestHandler.Handle(context, response, request);
-                }
-            });
+                    while (!CancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        var context = await listener.GetContextAsync();
+                        var request = context.Request;
+                        var response = context.Response;
+                        await RequestHandler.Handle(context, response, request);
+                    }
+                },
+                CancellationTokenSource.Token);
         }
         else
         {

@@ -15,11 +15,13 @@
 // limitations under the License.
 // </copyright>
 
+using MA.Common.Abstractions;
+
 namespace MA.Streaming.Abstraction;
 
 public interface IKafkaBrokerAvailabilityChecker
 {
-    bool Check(string brokerUrl);
+    bool Check(string brokerUrl, ILogger? logger = null);
 
-    Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource);
+    Task CheckContinuously(string brokerUrl, CancellationTokenSource cancellationTokenSource, ILogger? logger = null);
 }

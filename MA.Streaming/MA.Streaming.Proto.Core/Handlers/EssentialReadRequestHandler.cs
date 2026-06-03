@@ -25,7 +25,6 @@ using MA.Streaming.API;
 using MA.Streaming.Contracts;
 using MA.Streaming.Core;
 using MA.Streaming.Core.Abstractions;
-using MA.Streaming.Core.Routing;
 using MA.Streaming.OpenData;
 using MA.Streaming.PrometheusMetrics;
 using MA.Streaming.Proto.Core.Abstractions;
@@ -45,6 +44,7 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
     private readonly GenericBuffer<PacketReceivedInfoEventArgs> writingBuffer;
     private readonly AutoResetEvent autoResetEvent = new(false);
     private IServerStreamWriter<ReadEssentialsResponse>? currentResponseStream;
+    private int stoppedFlag;
 
     public EssentialReadRequestHandler(
         IEssentialPacketsReaderConnectorService essentialPacketsReaderConnectorService,
@@ -62,7 +62,7 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
         this.request = request;
         this.responseStream = responseStream;
         this.connectionDetails = connectionDetails;
-        this.writingBuffer = new GenericBuffer<PacketReceivedInfoEventArgs>(this, new CancellationTokenSourceProvider());
+        this.writingBuffer = new GenericBuffer<PacketReceivedInfoEventArgs>(this, context.CancellationToken, logger);
     }
 
     public event EventHandler<DateTime>? HandlingStopped;
@@ -121,11 +121,18 @@ public class EssentialReadRequestHandler : IEssentialReadRequestHandler, IBuffer
             },
             this.context.CancellationToken);
 
+        using var registration = this.context.CancellationToken.Register(this.StopHandling);
         this.autoResetEvent.WaitOne();
     }
 
     public void StopHandling()
     {
+        if (Interlocked.Exchange(ref this.stoppedFlag, 1) == 1)
+        {
+            return;
+        }
+
+        this.essentialPacketsReaderConnectorService.PacketReceived -= this.EssentialPacketsReaderConnectorService_PacketReceived;
         this.essentialPacketsReaderConnectorService.Stop();
         this.autoResetEvent.Set();
         this.HandlingStopped?.Invoke(this, DateTime.Now);

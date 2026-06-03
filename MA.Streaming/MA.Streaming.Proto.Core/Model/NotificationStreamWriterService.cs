@@ -22,25 +22,35 @@ using MA.Streaming.Proto.Core.Abstractions;
 
 namespace MA.Streaming.Proto.Core.Model;
 
+/// <summary>
+/// Service for managing notification stream writers and sending messages to connected clients.
+/// </summary>
+/// <typeparam name="TNotificationMessage">The type of notification message to stream.</typeparam>
 public class NotificationStreamWriterService<TNotificationMessage> : INotificationStreamWriterService<TNotificationMessage>
 {
     private static readonly ThreadSafeInMemoryRepository<string, List<StreamWriterItem<TNotificationMessage>>> WritersRepository = new();
 
-    public async Task AddAndHoldStreamWriter(string dataSource, IServerStreamWriter<TNotificationMessage> notificationStreamWriter)
+    /// <inheritdoc />
+    public async Task AddAndHoldStreamWriter(string dataSource, IServerStreamWriter<TNotificationMessage> notificationStreamWriter, CancellationToken cancellationToken = default)
     {
         var streamWriterItems = WritersRepository.Get(dataSource);
         if (streamWriterItems == null)
         {
-            streamWriterItems = new List<StreamWriterItem<TNotificationMessage>>();
+            streamWriterItems = [];
             WritersRepository.AddOrUpdate(dataSource, streamWriterItems);
         }
 
         var autoResetEvent = new AutoResetEvent(false);
         streamWriterItems.Add(new StreamWriterItem<TNotificationMessage>(notificationStreamWriter, autoResetEvent));
-        autoResetEvent.WaitOne();
+        await using (cancellationToken.Register(() => autoResetEvent.Set()))
+        {
+            autoResetEvent.WaitOne();
+        }
+
         await Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public async Task SendMessage(string dataSource, TNotificationMessage message)
     {
         var streamWriterItems = WritersRepository.Get(dataSource);

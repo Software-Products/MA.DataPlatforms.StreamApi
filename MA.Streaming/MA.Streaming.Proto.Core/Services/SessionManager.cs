@@ -130,7 +130,7 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
             return;
         }
 
-        await this.sessionNotificationManagerService.AddStartNotificationStream(request.DataSource, responseStream);
+        await this.sessionNotificationManagerService.AddStartNotificationStream(request.DataSource, responseStream, context.CancellationToken);
     }
 
     public override async Task GetSessionStopNotification(
@@ -143,7 +143,7 @@ public sealed class SessionManager : SessionManagementService.SessionManagementS
             return;
         }
 
-        await this.sessionNotificationManagerService.AddStopNotificationStream(request.DataSource, responseStream);
+        await this.sessionNotificationManagerService.AddStopNotificationStream(request.DataSource, responseStream, context.CancellationToken);
     }
 
     public override async Task<UpdateSessionIdentifierResponse> UpdateSessionIdentifier(UpdateSessionIdentifierRequest request, ServerCallContext context)

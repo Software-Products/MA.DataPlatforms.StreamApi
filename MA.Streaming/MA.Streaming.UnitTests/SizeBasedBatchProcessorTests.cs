@@ -15,6 +15,8 @@
 // limitations under the License.
 // </copyright>
 
+using System.Diagnostics;
+
 using MA.Common.Abstractions;
 using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Core.Handlers;
@@ -84,6 +86,31 @@ public class SizeBasedBatchProcessorTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Polls until at least <paramref name="expectedBatchCount"/> batches have been
+    /// recorded or <paramref name="timeoutMs"/> elapses.  Using a polling loop instead
+    /// of a fixed Task.Delay makes tests resilient to CI scheduler latency: on a loaded
+    /// build agent, Task.Run startup and System.Timers.Timer callbacks can be delayed
+    /// by hundreds of milliseconds, causing fixed-sleep tests to assert before the
+    /// batch is actually processed.
+    /// </summary>
+    private async Task WaitForBatchesAsync(int expectedBatchCount = 1, int timeoutMs = 3000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            lock (this.lockObject)
+            {
+                if (this.processedBatches.Count >= expectedBatchCount)
+                {
+                    return;
+                }
+            }
+
+            await Task.Delay(50);
+        }
+    }
+
     [Fact]
     public async Task ShouldProcessBatch_WhenSizeThresholdReached()
     {
@@ -93,10 +120,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         const double Threshold = 0.70; // 70%
         const int ExpectedThreshold = (int)(MaxSize * Threshold); // 700 bytes
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: MaxSize,
             thresholdPercentage: Threshold,
             timeWindowMilliseconds: 10000 // Long window to ensure size triggers first
@@ -136,10 +164,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int TimeWindow = 100; // 100ms
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000, // Large size to ensure time triggers first
             thresholdPercentage: 0.70,
             timeWindowMilliseconds: TimeWindow
@@ -152,8 +181,10 @@ public class SizeBasedBatchProcessorTests : IDisposable
             processor.Add(packet);
         }
 
-        // Wait for time window to expire
-        await Task.Delay(TimeWindow + 200, cts.Token);
+        // Wait until the timer-triggered batch arrives (or timeout).
+        // A fixed Task.Delay is fragile on CI: Task.Run startup and Timer callbacks
+        // can be delayed by hundreds of ms on a loaded agent.
+        await this.WaitForBatchesAsync(expectedBatchCount: 1, timeoutMs: 3000);
 
         // Assert
         lock (this.lockObject)
@@ -175,10 +206,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int MaxSize = 500; // 500 bytes max
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: MaxSize,
             thresholdPercentage: 0.70, // 350 bytes threshold
             timeWindowMilliseconds: 10000
@@ -215,10 +247,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int TimeWindow = 150; // 150ms
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000,
             thresholdPercentage: 0.90, // High threshold to avoid size trigger
             timeWindowMilliseconds: TimeWindow
@@ -263,10 +296,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         const int TimeWindow = 100; // 100ms
         var totalMessagesAdded = 0;
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 100000, // Large enough to not hit size threshold
             thresholdPercentage: 0.90,
             timeWindowMilliseconds: TimeWindow
@@ -281,7 +315,7 @@ public class SizeBasedBatchProcessorTests : IDisposable
             totalMessagesAdded++;
         }
 
-        await Task.Delay(TimeWindow + 100, cts.Token); // Longer gap to ensure processing
+        await Task.Delay(TimeWindow + 1000, cts.Token); // Longer gap to ensure processing
 
         // Round 2: Messages -> Gap
         for (var i = 0; i < 5; i++)
@@ -290,7 +324,7 @@ public class SizeBasedBatchProcessorTests : IDisposable
             totalMessagesAdded++;
         }
 
-        await Task.Delay(TimeWindow + 100, cts.Token); // GAP 2
+        await Task.Delay(TimeWindow + 1000, cts.Token); // GAP 2
 
         // Round 3: Messages -> Gap
         for (var i = 0; i < 2; i++)
@@ -299,7 +333,7 @@ public class SizeBasedBatchProcessorTests : IDisposable
             totalMessagesAdded++;
         }
 
-        await Task.Delay(TimeWindow + 100, cts.Token); // GAP 3
+        await Task.Delay(TimeWindow + 1000, cts.Token); // GAP 3
 
         // Round 4: Messages -> Gap
         for (var i = 0; i < 4; i++)
@@ -308,7 +342,7 @@ public class SizeBasedBatchProcessorTests : IDisposable
             totalMessagesAdded++;
         }
 
-        await Task.Delay(TimeWindow + 200, cts.Token); // GAP 4 - Final processing
+        await Task.Delay(TimeWindow + 1000, cts.Token); // GAP 4 - Final processing
 
         // Assert: All messages should be processed across multiple batches
         lock (this.lockObject)
@@ -357,10 +391,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         const int TimeWindow = 80; // 80ms
         var totalMessagesAdded = 0;
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 50000,
             thresholdPercentage: 0.90,
             timeWindowMilliseconds: TimeWindow
@@ -406,10 +441,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int TimeWindow = 100;
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000,
             thresholdPercentage: 0.90,
             timeWindowMilliseconds: TimeWindow
@@ -469,10 +505,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int TimeWindow = 100;
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000,
             thresholdPercentage: 0.95, // Very high to ensure time-based triggering
             timeWindowMilliseconds: TimeWindow
@@ -521,10 +558,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         const int MaxSize = 300;
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: MaxSize,
             thresholdPercentage: 0.70, // 210 bytes threshold
             timeWindowMilliseconds: 5000
@@ -567,10 +605,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         // Arrange
         var cts = new CancellationTokenSource();
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000,
             thresholdPercentage: 0.90, // High threshold
             timeWindowMilliseconds: 10000 // Long window
@@ -583,6 +622,19 @@ public class SizeBasedBatchProcessorTests : IDisposable
 
         // Complete (triggers cancellation)
         await processor.CompleteAsync();
+
+
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
+        while (stopwatch.Elapsed.TotalSeconds < 5)
+        {
+            lock (this.lockObject)
+            {
+                if (this.processedBatches.Count>0)
+                    break;
+            }
+            await Task.Delay(100);
+        }
 
         // Assert
         lock (this.lockObject)
@@ -601,10 +653,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         // Arrange
         var cts = new CancellationTokenSource();
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 1000,
             thresholdPercentage: 0.70,
             timeWindowMilliseconds: 100
@@ -632,14 +685,15 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
         var processDelay = new TaskCompletionSource<bool>();
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: async (batch) =>
             {
                 await processDelay.Task; // Block processing
                 await this.MockProcessAction(batch);
             },
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 1000,
             thresholdPercentage: 0.70,
             timeWindowMilliseconds: 10000
@@ -671,10 +725,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         // Arrange
         var cts = new CancellationTokenSource();
 
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts,
+            cts.Token,
             maxBatchSizeBytes: 10000,
             thresholdPercentage: 0.70,
             timeWindowMilliseconds: 100
@@ -687,7 +742,8 @@ public class SizeBasedBatchProcessorTests : IDisposable
 
         processor.AddRange(messages);
 
-        await Task.Delay(300, cts.Token);
+        // Wait until the timer-triggered batch arrives (or timeout).
+        await this.WaitForBatchesAsync(expectedBatchCount: 1, timeoutMs: 3000);
 
         // Assert
         lock (this.lockObject)
@@ -709,10 +765,11 @@ public class SizeBasedBatchProcessorTests : IDisposable
         var cts = new CancellationTokenSource();
 
         // Use defaults: 3MB max, 70% threshold, 50ms window
-        var processor = new SizeBasedBatchProcessor<Packet>(this.logger,
+        var processor = new SizeBasedBatchProcessor<Packet>(
+            this.logger,
             processAction: this.MockProcessAction,
             sizeCalculator: p => p.CalculateSize(),
-            cancellationTokenSource: cts
+            cts.Token
         );
 
         // Act
@@ -721,7 +778,7 @@ public class SizeBasedBatchProcessorTests : IDisposable
             processor.Add(PacketFactory.CreatePacket(1000)); // 1KB each
         }
 
-        await Task.Delay(1000, cts.Token);
+        await Task.Delay(2000, cts.Token);
 
         // Assert
         lock (this.lockObject)
