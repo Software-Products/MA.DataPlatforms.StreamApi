@@ -21,8 +21,37 @@ namespace MA.Streaming.Core.Routing;
 
 public static class KafkaPublishingConfigCreator
 {
-    public static KafkaPublishingConfig Create(string brokerUrl)
+    /// <summary>
+    /// Statistics interval (ms) applied to Kafka clients when router metrics are enabled.
+    /// 0 disables the librdkafka statistics callback entirely (no overhead).
+    /// </summary>
+    public const int EnabledStatisticsIntervalMs = 5000;
+
+    /// <summary>
+    /// Stream API producer opinions expressed as raw librdkafka keys. Only values that differ from
+    /// Confluent/librdkafka defaults are listed here — everything else uses the Confluent default.
+    /// The JSON broker config file is layered on top of these via the override mechanism.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> DefaultProperties =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["compression.type"]                       = "zstd",
+            ["linger.ms"]                              = "20",
+            ["batch.size"]                             = "4194304",
+            ["queue.buffering.max.messages"]           = "2000000",
+            ["queue.buffering.max.kbytes"]             = "2097152",
+            ["message.max.bytes"]                      = "4194304",
+            ["message.timeout.ms"]                     = "600000",
+            ["acks"]                                   = "1",
+            ["max.in.flight.requests.per.connection"]  = "1000000",
+            ["enable.idempotence"]                     = "false",
+        };
+
+    public static KafkaPublishingConfig Create(string brokerUrl, int statisticsIntervalMs = 0)
     {
-        return new KafkaPublishingConfig(brokerUrl, -1, 4, 0, 10_000_000, int.MaxValue);
+        var props = new Dictionary<string, string>(DefaultProperties, StringComparer.OrdinalIgnoreCase);
+        if (statisticsIntervalMs > 0)
+            props["statistics.interval.ms"] = statisticsIntervalMs.ToString();
+        return new KafkaPublishingConfig(brokerUrl, props);
     }
 }

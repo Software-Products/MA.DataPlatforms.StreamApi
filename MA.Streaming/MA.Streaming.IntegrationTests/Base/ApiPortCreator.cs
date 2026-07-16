@@ -23,6 +23,6 @@ public static class ApiPortCreator
 
     public static int CreateNew()
     {
-        return initialisePort++;
+        return Interlocked.Increment(ref initialisePort);
     }
 }

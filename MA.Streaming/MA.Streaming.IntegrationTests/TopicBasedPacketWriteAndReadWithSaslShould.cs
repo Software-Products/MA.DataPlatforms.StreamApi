@@ -1,0 +1,43 @@
+// <copyright file="TopicBasedPacketWriteAndReadWithSaslShould.cs" company="Motion Applied Ltd.">
+//
+// Copyright 2025 Motion Applied Ltd
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// </copyright>
+
+using MA.Streaming.Abstraction;
+using MA.Streaming.IntegrationTests.Base;
+using MA.Streaming.IntegrationTests.Helper;
+
+using Xunit;
+using Xunit.Abstractions;
+
+namespace MA.Streaming.IntegrationTests;
+
+/// <summary>
+/// Runs the full topic-based write/read test suite against SASL/PLAIN-secured Kafka (port 9099).
+/// Uses distinct DataSource and Domain values so topics never collide with the plain-Kafka run.
+/// </summary>
+[Collection(nameof(RunKafkaDockerComposeCollectionFixture))]
+public class TopicBasedPacketWriteAndReadWithSaslShould : TopicBasedPacketWriteAndReadBase
+{
+    public TopicBasedPacketWriteAndReadWithSaslShould(ITestOutputHelper outputHelper) : base(outputHelper) { }
+
+    protected override string BrokerUrl => "localhost:9099";
+    protected override string DataSource => "SASL_TBPWRSDataSource";
+    protected override string Domain => "SASL_TBPWRSDomain";
+    protected override string SessionKeyPrefix => "SASL_TBPWRSSessionKey";
+
+    protected override IKafkaSecurityConfigurationProvider CreateSecurityProvider() =>
+        new SaslPlainKafkaSecurityConfigProvider();
+}

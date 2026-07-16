@@ -15,11 +15,11 @@
 // limitations under the License.
 // </copyright>
 
-using MA.Streaming.Core.Routing;
+using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 
 namespace MA.Streaming.Core.Abstractions;
 
 public interface IEssentialRouterConfigurationProvider
 {
-    RoutingConfigurationProvider Provide(string dataSource);
+    IRoutingConfigurationProvider Provide(string dataSource);
 }

@@ -18,6 +18,7 @@
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
@@ -32,18 +33,27 @@ public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
     private readonly IRouteManager routeManager;
     private readonly IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> routeReadingWritingComponentRepository;
     private readonly ILogger logger;
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
+    private readonly string filePath;
+    private readonly string? whitelistFilePath;
+
     public EssentialRouteReaderFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         IKafkaRouteInfoCreator kafkaRouteInfoCreator,
         IRouteManager routeManager,
         IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> routeReadingWritingComponentRepository,
-        ILogger logger)
+        ILogger logger,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.routeManager = routeManager;
         this.routeReadingWritingComponentRepository = routeReadingWritingComponentRepository;
         this.logger = logger;
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
+        var config = streamingApiConfigurationProvider.Provide();
+        this.filePath = config.KafkaBrokerConsumingConfigFilePath;
+        this.whitelistFilePath = config.KafkaBrokerConfigWhitelistFilePath;
     }
 
     public IRouteSubscriber Create(ConnectionDetailsDto connectionDetailsDto)
@@ -53,16 +63,16 @@ public class EssentialRouteReaderFactory : IEssentialRouteReaderFactory
 
     private KafkaRouteSubscriber CreateRouteReader(ConnectionDetailsDto connectionDetailsDto)
     {
-        var basedSubscriptionConfigurationProvider =
-            new EssentialRouteConsumingConfigurationProvider(
-                connectionDetailsDto,
-                this.streamingApiConfigurationProvider,
-                this.kafkaRouteInfoCreator);
+        IConsumingConfigurationProvider provider = new EssentialRouteConsumingConfigurationProvider(
+            connectionDetailsDto,
+            this.streamingApiConfigurationProvider,
+            this.kafkaRouteInfoCreator);
+
+        provider = ConsumingConfigurationProviderCreator.ApplyFileOverride(provider, this.filePath, this.kafkaSecurityConfigProvider, this.whitelistFilePath);
+
         return new KafkaRouteSubscriber(
-            new KafkaListenerFactory(
-                basedSubscriptionConfigurationProvider,
-                this.logger),
-            basedSubscriptionConfigurationProvider,
+            new KafkaListenerFactory(provider, this.logger),
+            provider,
             this.routeManager,
             this.logger,
             this.routeReadingWritingComponentRepository,

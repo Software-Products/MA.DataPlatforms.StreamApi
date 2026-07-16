@@ -19,6 +19,7 @@ using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent;
 using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 using MA.DataPlatforms.Secu4.RouterComponent.BrokersPublishers.KafkaBroking;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
@@ -34,6 +35,7 @@ public class DomainRouterProvider : IDomainRouterProvider
     private readonly IRouteManager routeManager;
     private readonly IRouteReadingWritingComponentRepository<KafkaRouter> readingWritingComponentRepository;
     private readonly IDomainNameProvider domainNameProvider;
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
 
     private KafkaRouter? domainRouter;
 
@@ -45,7 +47,8 @@ public class DomainRouterProvider : IDomainRouterProvider
         IKafkaRouteInfoCreator kafkaRouteInfoCreator,
         IRouteManager routeManager,
         IRouteReadingWritingComponentRepository<KafkaRouter> readingWritingComponentRepository,
-        IDomainNameProvider domainNameProvider)
+        IDomainNameProvider domainNameProvider,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.logger = logger;
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
@@ -53,6 +56,7 @@ public class DomainRouterProvider : IDomainRouterProvider
         this.routeManager = routeManager;
         this.readingWritingComponentRepository = readingWritingComponentRepository;
         this.domainNameProvider = domainNameProvider;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
     }
 
     public IRouter Provide()
@@ -79,7 +83,7 @@ public class DomainRouterProvider : IDomainRouterProvider
         }
     }
 
-    private RoutingConfigurationProvider CreateRoutingConfigurationProvider()
+    private IRoutingConfigurationProvider CreateRoutingConfigurationProvider()
     {
         var config = this.streamingApiConfigurationProvider.Provide();
         var sessionInfoRouteInfo = this.kafkaRouteInfoCreator.CreateSessionInfoRouteInfo();
@@ -100,12 +104,17 @@ public class DomainRouterProvider : IDomainRouterProvider
 
         var routingConfiguration = new RoutingConfiguration(
             new KafkaRoutingConfig(
-                KafkaPublishingConfigCreator.Create(config.BrokerUrl),
+                KafkaPublishingConfigCreator.Create(config.BrokerUrl, config.EnableRouterPublishMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 routes,
                 metaData,
-                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic));
+                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic,
+                this.kafkaSecurityConfigProvider.Provide()));
 
-        var configurationProvider = new RoutingConfigurationProvider(routingConfiguration);
-        return configurationProvider;
+        IRoutingConfigurationProvider configurationProvider = new RoutingConfigurationProvider(routingConfiguration);
+        return RoutingConfigurationProviderCreator.ApplyFileOverride(
+            configurationProvider,
+            config.KafkaBrokerPublishingConfigFilePath,
+            this.kafkaSecurityConfigProvider,
+            whitelistFilePath: config.KafkaBrokerConfigWhitelistFilePath);
     }
 }

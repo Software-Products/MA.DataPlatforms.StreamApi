@@ -19,6 +19,7 @@ using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 
 using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 
 namespace MA.Streaming.IntegrationTests.Helper;
 
@@ -26,12 +27,10 @@ internal class KafkaTopicCreatorHelper
 {
     private readonly IAdminClient adminClient;
 
-    public KafkaTopicCreatorHelper(string server)
+    public KafkaTopicCreatorHelper(string server, KafkaSecurityConfig? security = null)
     {
-        var adminClientConfig = new AdminClientConfig
-        {
-            BootstrapServers = server,
-        };
+        var adminClientConfig = new AdminClientConfig { BootstrapServers = server };
+        KafkaSecurityApplier.Apply(adminClientConfig, security);
         this.adminClient = new AdminClientBuilder(adminClientConfig).Build();
     }
 
@@ -53,7 +52,7 @@ internal class KafkaTopicCreatorHelper
             when (ex.InnerExceptions.OfType<CreateTopicsException>()
                     .All(e => e.Results.All(r => r.Error.Code == ErrorCode.TopicAlreadyExists)))
         {
-            // Topic already exists from a previous test run — this is not an error.
+            // Topic already exists — not an error.
         }
         catch (Exception ex)
         {

@@ -18,6 +18,7 @@
 using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
@@ -32,31 +33,41 @@ public class DataFormatRouteSubscriberFactory : IDataFormatRouteSubscriberFactor
     private readonly IRouteManager routeManager;
     private readonly IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository;
     private readonly IDomainNameProvider domainNameProvider;
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
+    private readonly string filePath;
+    private readonly string? whitelistFilePath;
 
     public DataFormatRouteSubscriberFactory(
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
         ILogger logger,
         IRouteManager routeManager,
         IRouteReadingWritingComponentRepository<KafkaRouteSubscriber> readingWritingComponentRepository,
-        IDomainNameProvider domainNameProvider
-    )
+        IDomainNameProvider domainNameProvider,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
         this.logger = logger;
         this.routeManager = routeManager;
         this.readingWritingComponentRepository = readingWritingComponentRepository;
         this.domainNameProvider = domainNameProvider;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
+        var config = streamingApiConfigurationProvider.Provide();
+        this.filePath = config.KafkaBrokerConsumingConfigFilePath;
+        this.whitelistFilePath = config.KafkaBrokerConfigWhitelistFilePath;
     }
 
     public IRouteSubscriber Create(IReadOnlyList<KafkaRoute> routes)
     {
-        var dataFormatSubscriptionConfigurationProvider = new DataFormatConsumingConfigurationProvider(this.streamingApiConfigurationProvider, routes);
-        var kafkaListenerFactory = new KafkaListenerFactory(
-            dataFormatSubscriptionConfigurationProvider,
-            this.logger);
+        IConsumingConfigurationProvider provider = new DataFormatConsumingConfigurationProvider(
+            this.streamingApiConfigurationProvider,
+            routes);
+
+        provider = ConsumingConfigurationProviderCreator.ApplyFileOverride(provider, this.filePath, this.kafkaSecurityConfigProvider, this.whitelistFilePath);
+
+        var kafkaListenerFactory = new KafkaListenerFactory(provider, this.logger);
         return new KafkaRouteSubscriber(
             kafkaListenerFactory,
-            dataFormatSubscriptionConfigurationProvider,
+            provider,
             this.routeManager,
             this.logger,
             this.readingWritingComponentRepository,

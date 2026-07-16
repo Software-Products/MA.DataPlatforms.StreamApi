@@ -48,6 +48,7 @@ public sealed class Server : IServer
     private readonly ILogger? logger;
     private readonly int grpcMaxSendMessageSize;
     private readonly int grpcMaxReceiveMessageSize;
+    private readonly IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider;
 
     public Server(
         IStreamingApiConfiguration streamingApiConfiguration,
@@ -57,7 +58,8 @@ public sealed class Server : IServer
         bool registerServices = false,
         ILogger? logger = null,
         int? grpcMaxSendMessageSize = null,
-        int? grpcMaxReceiveMessageSize = null)
+        int? grpcMaxReceiveMessageSize = null,
+        IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider = null)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
@@ -67,6 +69,7 @@ public sealed class Server : IServer
         this.logger = logger;
         this.grpcMaxSendMessageSize = grpcMaxSendMessageSize ?? 4 * 1024 * 1024; //4 MB default
         this.grpcMaxReceiveMessageSize = grpcMaxReceiveMessageSize ?? 4 * 1024 * 1024; //4 MB default
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
         this.streamingApiConfiguration = this.ValidateStreamApiConfiguration(streamingApiConfiguration);
     }
 
@@ -102,7 +105,13 @@ public sealed class Server : IServer
             validatingStreamingApiConfiguration.Domain,
             batchingSizesKb,
             validatingStreamingApiConfiguration.BatchingTimeMs,
-            validatingStreamingApiConfiguration.EnableGrpcReflection);
+            validatingStreamingApiConfiguration.EnableGrpcReflection,
+            validatingStreamingApiConfiguration.KafkaBrokerPublishingConfigFilePath,
+            validatingStreamingApiConfiguration.KafkaBrokerConsumingConfigFilePath,
+            validatingStreamingApiConfiguration.KafkaBrokerConfigWhitelistFilePath,
+            validatingStreamingApiConfiguration.Security,
+            validatingStreamingApiConfiguration.EnableRouterPublishMetrics,
+            validatingStreamingApiConfiguration.EnableRouterConsumeMetrics);
     }
 
     public void Dispose()
@@ -194,7 +203,8 @@ public sealed class Server : IServer
             this.streamingApiConfiguration,
             this.cancellationTokenSourceProvider,
             this.loggingDirectoryProvider,
-            this.logger).Configure(
+            this.logger,
+            this.kafkaSecurityConfigProvider).Configure(
             builder.Services,
             this.registerServices);
 

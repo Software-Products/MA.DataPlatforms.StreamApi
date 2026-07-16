@@ -17,18 +17,19 @@
 
 using Confluent.Kafka;
 
+using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.Routing.Shared.Core;
+
 namespace MA.Streaming.IntegrationTests.Helper;
 
 internal class KafkaPublishHelper
 {
     private readonly IProducer<string?, byte[]> producer;
 
-    public KafkaPublishHelper(string brokerUrl)
+    public KafkaPublishHelper(string brokerUrl, KafkaSecurityConfig? security = null)
     {
-        var configuration = new ProducerConfig
-        {
-            BootstrapServers = brokerUrl
-        };
+        var configuration = new ProducerConfig { BootstrapServers = brokerUrl };
+        KafkaSecurityApplier.Apply(configuration, security);
         this.producer = new ProducerBuilder<string?, byte[]>(configuration).Build();
     }
 
@@ -38,11 +39,7 @@ internal class KafkaPublishHelper
         {
             this.producer.Produce(
                 new TopicPartition(topic, partition),
-                new Message<string?, byte[]>
-                {
-                    Key = key,
-                    Value = data
-                });
+                new Message<string?, byte[]> { Key = key, Value = data });
         }
         catch (Exception ex)
         {

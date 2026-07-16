@@ -20,6 +20,7 @@ using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.DataPlatforms.Secu4.RouterComponent;
 using MA.DataPlatforms.Secu4.RouteSubscriberComponent;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
@@ -54,23 +55,27 @@ public class ServiceConfigurator
     private readonly ICancellationTokenSourceProvider cancellationTokenSourceProvider;
     private readonly ILoggingDirectoryProvider loggingDirectoryProvider;
     private readonly ILogger? logger;
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
 
     public ServiceConfigurator(
         IStreamingApiConfiguration streamingApiConfiguration,
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         ILoggingDirectoryProvider loggingDirectoryProvider,
-        ILogger? logger)
+        ILogger? logger,
+        IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
         this.loggingDirectoryProvider = loggingDirectoryProvider;
         this.logger = logger;
+        this.kafkaSecurityConfigProvider = new KafkaSecurityConfigurationProviderAdapter(kafkaSecurityConfigProvider, logger);
     }
 
     public void Configure(IServiceCollection serviceCollection, bool registerServices)
     {
         ConfigureLogging(serviceCollection, this.logger);
         serviceCollection.AddSingleton<IStreamingApiConfigurationProvider>(new StreamingApiConfigurationProvider(this.streamingApiConfiguration));
+        serviceCollection.AddSingleton(this.kafkaSecurityConfigProvider);
         serviceCollection.AddSingleton<IRouteManager, KafkaRouteManager>();
         serviceCollection.AddSingleton<IActiveConnectionManager, ActiveConnectionManager>();
         serviceCollection.AddSingleton<IDomainNameProvider>(new DomainNameProvider(this.streamingApiConfiguration.Domain));
@@ -202,3 +207,4 @@ public class ServiceConfigurator
         }
     }
 }
+

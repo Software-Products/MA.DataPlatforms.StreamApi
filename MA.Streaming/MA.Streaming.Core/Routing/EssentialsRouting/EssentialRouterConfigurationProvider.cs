@@ -15,6 +15,8 @@
 // limitations under the License.
 // </copyright>
 
+using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
@@ -25,18 +27,21 @@ public class EssentialRouterConfigurationProvider : IEssentialRouterConfiguratio
 {
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfigurationProvider streamingApiConfigurationProvider;
-    private readonly Dictionary<string, RoutingConfigurationProvider> configurationProviders = new();
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
+    private readonly Dictionary<string, IRoutingConfigurationProvider> configurationProviders = new();
     private readonly object readWriteLock = new();
 
     public EssentialRouterConfigurationProvider(
         IKafkaRouteInfoCreator kafkaRouteInfoCreator,
-        IStreamingApiConfigurationProvider streamingApiConfigurationProvider)
+        IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.streamingApiConfigurationProvider = streamingApiConfigurationProvider;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
     }
 
-    public RoutingConfigurationProvider Provide(string dataSource)
+    public IRoutingConfigurationProvider Provide(string dataSource)
     {
         lock (this.readWriteLock)
         {
@@ -51,7 +56,7 @@ public class EssentialRouterConfigurationProvider : IEssentialRouterConfiguratio
         }
     }
 
-    private RoutingConfigurationProvider CreateConfigurationProvider(string dataSource)
+    private IRoutingConfigurationProvider CreateConfigurationProvider(string dataSource)
     {
         var config = this.streamingApiConfigurationProvider.Provide();
         var deadLetterRouteInfo = this.kafkaRouteInfoCreator.CreateDeadLetterRouteInfo();
@@ -66,10 +71,17 @@ public class EssentialRouterConfigurationProvider : IEssentialRouterConfiguratio
         };
         var configuration = new RoutingConfiguration(
             new KafkaRoutingConfig(
-                KafkaPublishingConfigCreator.Create(config.BrokerUrl),
+                KafkaPublishingConfigCreator.Create(config.BrokerUrl, config.EnableRouterPublishMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 routes,
                 metaData,
-                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic));
-        return new RoutingConfigurationProvider(configuration);
+                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic,
+                this.kafkaSecurityConfigProvider.Provide()));
+
+        IRoutingConfigurationProvider provider = new RoutingConfigurationProvider(configuration);
+        return RoutingConfigurationProviderCreator.ApplyFileOverride(
+            provider,
+            config.KafkaBrokerPublishingConfigFilePath,
+            this.kafkaSecurityConfigProvider,
+            whitelistFilePath: config.KafkaBrokerConfigWhitelistFilePath);
     }
 }

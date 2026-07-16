@@ -48,4 +48,38 @@ public interface IStreamingApiConfiguration
     public int BatchingTimeMs { get; }
 
     bool EnableGrpcReflection { get; }
+
+    /// <summary>
+    /// When <see langword="true"/>, enables the router's Prometheus metrics for the publish side by
+    /// turning on the Kafka producer statistics callback. Defaults to <see langword="false"/> — the
+    /// callback never fires and there is zero overhead. The callback is timer-based (not per-message),
+    /// so cost does not scale with message volume.
+    /// </summary>
+    bool EnableRouterPublishMetrics { get; }
+
+    /// <summary>
+    /// When <see langword="true"/>, enables the router's Prometheus metrics for the consume side by
+    /// turning on the Kafka consumer statistics callback. Defaults to <see langword="false"/>.
+    /// </summary>
+    bool EnableRouterConsumeMetrics { get; }
+
+    string KafkaBrokerPublishingConfigFilePath { get; }
+
+    string KafkaBrokerConsumingConfigFilePath { get; }
+
+    /// <summary>
+    /// Path to the optional JSON whitelist file that controls which keys in the broker override
+    /// files are allowed to override the running configuration.
+    /// Publish rules are applied to the publisher; consume rules to all consumers.
+    /// When the file does not exist no whitelist is enforced (all keys allowed).
+    /// Defaults to <c>kafka-broker-whitelist.json</c>.
+    /// </summary>
+    string KafkaBrokerConfigWhitelistFilePath { get; }
+
+    /// <summary>
+    /// Kafka security credentials. Populated from the <c>StreamApiConfig:Security</c> section
+    /// of any loaded configuration source, including the dedicated security config file and
+    /// environment variables (<c>StreamApiConfig__Security__SaslUsername</c> etc.).
+    /// </summary>
+    KafkaSecurityConfiguration? Security { get; }
 }

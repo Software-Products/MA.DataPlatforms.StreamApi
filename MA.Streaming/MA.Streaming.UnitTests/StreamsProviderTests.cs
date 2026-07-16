@@ -90,7 +90,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         var expectedStreams = new List<string>
         {
@@ -147,7 +148,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         var expectedStreams = new List<string>
         {
@@ -202,7 +204,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         // Act
         var result1 = streamsProvider.Provide(DataSource);
@@ -224,7 +227,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         // Act
         var result = streamsProvider.Provide(DataSource);
@@ -265,7 +269,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         // Act
         var result = streamsProvider.Provide(DataSource);
@@ -287,7 +292,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         // Act
         var result = streamsProvider.Provide(DataSource);
@@ -326,7 +332,8 @@ public class StreamsProviderTests
         var streamsProvider = new StreamsProvider(
             this.configurationProvider,
             this.kafkaTopicHelper,
-            this.kafkaRouteInfoCreator);
+            this.kafkaRouteInfoCreator,
+            new EmptyKafkaSecurityConfigProvider());
 
         // Act
         var result = streamsProvider.Provide(DataSource);

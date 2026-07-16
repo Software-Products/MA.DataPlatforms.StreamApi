@@ -46,24 +46,23 @@ public class EssentialRouteConsumingConfigurationProvider : IConsumingConfigurat
         var kafkaSubscriptionConfigs = new List<KafkaConsumingConfig>
         {
             new(
-                new KafkaListeningConfig(
+                KafkaListeningConfigCreator.Create(
                     this.streamApiConfig.BrokerUrl,
                     essentialReaderGroupName,
                     AutoOffsetResetMode.FromOffset,
-                    this.connectionDetailsDto.EssentialsOffset),
+                    this.connectionDetailsDto.EssentialsOffset,
+                    statisticsIntervalMs: this.streamApiConfig.EnableRouterConsumeMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 essentialRoute,
                 new KafkaTopicMetaData(essentialRoute.Topic, 1))
         };
-        return new ConsumingConfiguration(
-            kafkaSubscriptionConfigs);
+        return new ConsumingConfiguration(kafkaSubscriptionConfigs);
     }
 
     private static KafkaRoute GetEssentialRoute(KafkaRouteInfo kafkaRouteInfo)
     {
-        var essentialRoute = new KafkaRoute(
+        return new KafkaRoute(
             kafkaRouteInfo.RouteNameInfo.Name,
             kafkaRouteInfo.KafkaRouteTopicInfo.Topic,
             kafkaRouteInfo.KafkaRouteTopicInfo.Partition);
-        return essentialRoute;
     }
 }

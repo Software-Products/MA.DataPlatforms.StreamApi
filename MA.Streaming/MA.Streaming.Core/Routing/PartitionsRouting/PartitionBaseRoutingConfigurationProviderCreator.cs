@@ -15,7 +15,10 @@
 // limitations under the License.
 // </copyright>
 
+using MA.Common.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 using MA.Streaming.Abstraction;
 
 namespace MA.Streaming.Core.Routing.PartitionsRouting;
@@ -24,18 +27,24 @@ public class PartitionBaseRoutingConfigurationProviderCreator
 {
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
-    private readonly Dictionary<string, RoutingConfigurationProvider> routingConfigurationHolders = new();
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
+    private readonly ILogger? logger;
+    private readonly Dictionary<string, IRoutingConfigurationProvider> routingConfigurationHolders = new();
     private readonly object readWriteLock = new();
 
     public PartitionBaseRoutingConfigurationProviderCreator(
         IKafkaRouteInfoCreator kafkaRouteInfoCreator,
-        IStreamingApiConfiguration streamingApiConfiguration)
+        IStreamingApiConfiguration streamingApiConfiguration,
+        IKafkaSecurityConfigProvider? kafkaSecurityConfigProvider = null,
+        ILogger? logger = null)
     {
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.streamingApiConfiguration = streamingApiConfiguration;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider ?? new EmptyKafkaSecurityConfigProvider();
+        this.logger = logger;
     }
 
-    public RoutingConfigurationProvider Create(string dataSource)
+    public IRoutingConfigurationProvider Create(string dataSource)
     {
         lock (this.readWriteLock)
         {
@@ -45,7 +54,6 @@ public class PartitionBaseRoutingConfigurationProviderCreator
             }
 
             var deadLetterRouteInfo = this.kafkaRouteInfoCreator.CreateDeadLetterRouteInfo();
-
             var mainRouteInfo = this.kafkaRouteInfoCreator.CreateMainRouteInfo(dataSource);
 
             var routes = new List<KafkaRoute>
@@ -71,13 +79,22 @@ public class PartitionBaseRoutingConfigurationProviderCreator
 
             var configuration = new RoutingConfiguration(
                 new KafkaRoutingConfig(
-                    KafkaPublishingConfigCreator.Create(this.streamingApiConfiguration.BrokerUrl),
+                    KafkaPublishingConfigCreator.Create(this.streamingApiConfiguration.BrokerUrl, this.streamingApiConfiguration.EnableRouterPublishMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                     routes,
                     metaData,
-                    deadLetterRouteInfo.KafkaRouteTopicInfo.Topic));
-            var routingConfigurationHolder = new RoutingConfigurationProvider(configuration);
-            this.routingConfigurationHolders.Add(dataSource, routingConfigurationHolder);
-            return routingConfigurationHolder;
+                    deadLetterRouteInfo.KafkaRouteTopicInfo.Topic,
+                    this.kafkaSecurityConfigProvider.Provide()));
+
+            IRoutingConfigurationProvider provider = new RoutingConfigurationProvider(configuration);
+            provider = RoutingConfigurationProviderCreator.ApplyFileOverride(
+                provider,
+                this.streamingApiConfiguration.KafkaBrokerPublishingConfigFilePath,
+                this.kafkaSecurityConfigProvider,
+                this.logger,
+                this.streamingApiConfiguration.KafkaBrokerConfigWhitelistFilePath);
+
+            this.routingConfigurationHolders.Add(dataSource, provider);
+            return provider;
         }
     }
 }
