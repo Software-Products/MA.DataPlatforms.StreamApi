@@ -21,6 +21,7 @@ using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 
+using MA.Common.Abstractions;
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
@@ -34,6 +35,8 @@ using MA.Streaming.OpenData;
 using MA.Streaming.Proto.Client.Local;
 using MA.Streaming.Proto.Core.Providers;
 using MA.Streaming.Proto.ServerComponent;
+
+using NSubstitute;
 
 using Xunit;
 
@@ -69,6 +72,7 @@ public class PartitionBasedSessionManagerShould
                     streamApiPort: ApiPortCreator.CreateNew()));
 
         var routingMappingInfoRepository = new RoutingMappingInfoRepository();
+        var logger = Substitute.For<ILogger>();
         var domainNameProvider = new DomainNameProvider(Domain);
         var domainKafkaRouteMappingInfoCreator = new DomainKafkaRouteMappingInfoCreator(domainNameProvider, apiConfigurationProvider);
         var kafkaRouteInfoCreator = new KafkaRouteInfoCreator(domainKafkaRouteMappingInfoCreator, apiConfigurationProvider, routingMappingInfoRepository);
@@ -78,7 +82,7 @@ public class PartitionBasedSessionManagerShould
         this.essentialTopic = kafkaRouteInfoCreator.CreateEssentialRouteInfo(DataSource).KafkaRouteTopicInfo.Topic;
         this.mainStreamTopic = kafkaRouteInfoCreator.CreateMainRouteInfo(DataSource).KafkaRouteTopicInfo.Topic;
 
-        var topicsInfo = new KafkaTopicHelper().GetInfoByTopicContains(BrokerUrl, "");
+        var topicsInfo = new KafkaTopicHelper(logger).GetInfoByTopicContains(BrokerUrl, "");
         if (topicsInfo.All(i => i.TopicName != sessionInfoTopicName))
         {
             new KafkaTopicCreatorHelper(BrokerUrl).Create(new KafkaTopicMetaData(sessionInfoTopicName, 1));

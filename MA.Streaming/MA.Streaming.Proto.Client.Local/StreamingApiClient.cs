@@ -36,6 +36,7 @@ public class StreamingApiClient
     private readonly ILogger? logger;
     private readonly int? grpcMaxSendMessageSize;
     private readonly int? grpcMaxReceiveMessageSize;
+    private readonly IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider;
 
     internal StreamingApiClient(
         IStreamingApiConfiguration streamingApiConfiguration,
@@ -44,7 +45,8 @@ public class StreamingApiClient
         ILoggingDirectoryProvider loggingDirectoryProvider,
         ILogger? logger,
         int? grpcMaxSendMessageSize = null,
-        int? grpcMaxReceiveMessageSize = null)
+        int? grpcMaxReceiveMessageSize = null,
+        IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider = null)
     {
         this.streamingApiConfiguration = streamingApiConfiguration;
         this.cancellationTokenSourceProvider = cancellationTokenSourceProvider;
@@ -53,6 +55,7 @@ public class StreamingApiClient
         this.logger = logger;
         this.grpcMaxSendMessageSize = grpcMaxSendMessageSize;
         this.grpcMaxReceiveMessageSize = grpcMaxReceiveMessageSize;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
         this.cancellationToken = cancellationTokenSourceProvider.Provide().Token;
     }
 
@@ -82,7 +85,8 @@ public class StreamingApiClient
                 this.loggingDirectoryProvider,
                 logger: this.logger,
                 grpcMaxReceiveMessageSize: this.grpcMaxReceiveMessageSize,
-                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize);
+                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize,
+                kafkaSecurityConfigProvider: this.kafkaSecurityConfigProvider);
             this.server.Start().Wait(TimeSpan.FromSeconds(10));
             this.SetupGrpcChannel();
         }
@@ -121,7 +125,8 @@ public class StreamingApiClient
                 this.loggingDirectoryProvider,
                 logger: this.logger,
                 grpcMaxReceiveMessageSize: this.grpcMaxReceiveMessageSize,
-                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize);
+                grpcMaxSendMessageSize: this.grpcMaxSendMessageSize,
+                kafkaSecurityConfigProvider: this.kafkaSecurityConfigProvider);
             await this.server.StartAsync(this.cancellationToken);
             this.SetupGrpcChannel();
             this.Initialised = true;

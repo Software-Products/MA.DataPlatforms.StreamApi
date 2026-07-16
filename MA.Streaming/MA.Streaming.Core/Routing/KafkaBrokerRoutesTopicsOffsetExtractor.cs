@@ -16,6 +16,8 @@
 // </copyright>
 
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
 
@@ -27,17 +29,20 @@ public class KafkaBrokerRoutesOffsetExtractor : IKafkaBrokerRoutesOffsetExtracto
     protected readonly IKafkaTopicHelper KafkaTopicHelper;
     protected readonly IKafkaRouteInfoCreator KafkaRouteInfoCreator;
     private readonly string brokerUrl;
+    private readonly KafkaSecurityConfig? securityConfig;
     private readonly object readWriteLock = new();
 
     public KafkaBrokerRoutesOffsetExtractor(
         IKafkaTopicHelper kafkaTopicHelper,
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        IKafkaRouteInfoCreator kafkaRouteInfoCreator)
+        IKafkaRouteInfoCreator kafkaRouteInfoCreator,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.KafkaTopicHelper = kafkaTopicHelper;
         this.KafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.Configuration = streamingApiConfigurationProvider.Provide();
         this.brokerUrl = this.Configuration.BrokerUrl;
+        this.securityConfig = kafkaSecurityConfigProvider.Provide();
     }
 
     public IReadOnlyList<TopicPartitionOffsetDto> Extract(string dataSource)
@@ -48,7 +53,7 @@ public class KafkaBrokerRoutesOffsetExtractor : IKafkaBrokerRoutesOffsetExtracto
             var mainTopicRouteInfo = this.KafkaRouteInfoCreator.CreateMainRouteInfo(dataSource);
             var mainTopicName = mainTopicRouteInfo.KafkaRouteTopicInfo.Topic;
 
-            var dataTopicInfos = this.KafkaTopicHelper.GetInfoByTopicPrefix(this.brokerUrl, mainTopicName);
+            var dataTopicInfos = this.KafkaTopicHelper.GetInfoByTopicPrefix(this.brokerUrl, mainTopicName, this.securityConfig);
 
             AddMainStreamTopicPartitionOffset(dataTopicInfos, mainTopicRouteInfo, lstResult);
             this.AddEssentialStreamTopicPartitionOffset(dataSource, lstResult);
@@ -60,7 +65,7 @@ public class KafkaBrokerRoutesOffsetExtractor : IKafkaBrokerRoutesOffsetExtracto
 
     private void AddDataStreamTopicPartitionOffset(
         List<TopicPartitionOffsetDto> lstResult,
-        IEnumerable<TopicInfo> dataTopicInfos,
+        IReadOnlyList<TopicInfo> dataTopicInfos,
         string mainTopicName,
         string dataSource)
     {
@@ -107,7 +112,7 @@ public class KafkaBrokerRoutesOffsetExtractor : IKafkaBrokerRoutesOffsetExtracto
     private void AddEssentialStreamTopicPartitionOffset(string dataSource, List<TopicPartitionOffsetDto> lstResult)
     {
         var essentialRouteInfo = this.KafkaRouteInfoCreator.CreateEssentialRouteInfo(dataSource);
-        var essentialTopicInfos = this.KafkaTopicHelper.GetInfoByTopicPrefix(this.brokerUrl, essentialRouteInfo.KafkaRouteTopicInfo.Topic);
+        var essentialTopicInfos = this.KafkaTopicHelper.GetInfoByTopicPrefix(this.brokerUrl, essentialRouteInfo.KafkaRouteTopicInfo.Topic, this.securityConfig);
         var essentialTopicInfo = essentialTopicInfos.FirstOrDefault(i => i.TopicName == essentialRouteInfo.KafkaRouteTopicInfo.Topic && i.Partition == 0);
         lstResult.Add(
             essentialTopicInfo != null

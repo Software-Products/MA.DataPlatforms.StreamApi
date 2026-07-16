@@ -50,8 +50,7 @@ public class ConsumingConfigurationProvider : IConsumingConfigurationProvider
         }
 
         this.AddStreamsConfigurations(mainRoutePartitions, kafkaSubscriptionConfigs);
-        return new ConsumingConfiguration(
-            kafkaSubscriptionConfigs);
+        return new ConsumingConfiguration(kafkaSubscriptionConfigs);
     }
 
     private void AddMainStreamSubscription(List<KafkaConsumingConfig> kafkaSubscriptionConfigs, int mainRoutePartitions)
@@ -60,11 +59,12 @@ public class ConsumingConfigurationProvider : IConsumingConfigurationProvider
         var mainRoute = GetMainRoute(mainRouteInfo);
         kafkaSubscriptionConfigs.Add(
             new KafkaConsumingConfig(
-                new KafkaListeningConfig(
+                KafkaListeningConfigCreator.Create(
                     this.StreamApiConfig.BrokerUrl,
                     string.IsNullOrWhiteSpace(this.ConnectionDetailsDto.ConsumerGroup) ? $"Main_Data_Consuming_{Guid.NewGuid()}" : this.ConnectionDetailsDto.ConsumerGroup,
                     AutoOffsetResetMode.FromOffset,
-                    this.ConnectionDetailsDto.MainOffset),
+                    this.ConnectionDetailsDto.MainOffset,
+                    statisticsIntervalMs: this.StreamApiConfig.EnableRouterConsumeMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 mainRoute,
                 new KafkaTopicMetaData(mainRoute.Topic, mainRoutePartitions)));
     }
@@ -86,11 +86,12 @@ public class ConsumingConfigurationProvider : IConsumingConfigurationProvider
                     kafkaRouteInfo.KafkaRouteTopicInfo.Partition);
                 kafkaSubscriptionConfigs.Add(
                     new KafkaConsumingConfig(
-                        new KafkaListeningConfig(
+                        KafkaListeningConfigCreator.Create(
                             this.StreamApiConfig.BrokerUrl,
                             string.IsNullOrWhiteSpace(this.ConnectionDetailsDto.ConsumerGroup) ? $"Stream_Data_Consuming_{Guid.NewGuid()}" : this.ConnectionDetailsDto.ConsumerGroup,
                             AutoOffsetResetMode.FromOffset,
-                            streamOffset),
+                            streamOffset,
+                            statisticsIntervalMs: this.StreamApiConfig.EnableRouterConsumeMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                         kafkaRoute,
                         GetKafkaTopicMetaData(mainTopicName, mainTopicPartitionNumbers, kafkaRoute)));
             }

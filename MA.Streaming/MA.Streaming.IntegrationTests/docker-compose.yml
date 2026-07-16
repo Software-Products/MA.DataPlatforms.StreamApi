@@ -1,48 +1,71 @@
-
 services:
+  # ── Plain (no-auth) Kafka — port 9098 ─────────────────────────────────────
   stream_api_integration_test_kafka:
     image: apache/kafka:latest
     container_name: stream_api_integration_test_kafka
-    networks: [stream_net]
+    networks: [stream_net_combined]
     ports:
-      # External listener for host clients
       - "9098:9098"
     environment:
-      # KRaft (no ZooKeeper): combined controller+broker single node
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: "broker,controller"
-
-      # Listeners: internal (containers), controller (KRaft), and external (host)
       KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9098"
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://stream_api_integration_test_kafka:9092,EXTERNAL://localhost:9098"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@stream_api_integration_test_kafka:9093"
-
-      # Single-broker friendly defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"
 
-      # Persist broker data (optional but recommended)
-      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs"    
+  # ── SASL/PLAIN Kafka — port 9099 ──────────────────────────────────────────
+  stream_api_integration_test_kafka_sasl:
+    image: apache/kafka:latest
+    container_name: stream_api_integration_test_kafka_sasl
+    networks: [stream_net_combined]
+    ports:
+      - "9099:9099"
+    volumes:
+      - ./kafka_sasl_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "SASL_PLAINTEXT://:9095,CONTROLLER://:9096,EXTERNAL_SASL://:9099"
+      KAFKA_ADVERTISED_LISTENERS: "SASL_PLAINTEXT://stream_api_integration_test_kafka_sasl:9095,EXTERNAL_SASL://localhost:9099"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL_SASL:SASL_PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SASL_PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "2@stream_api_integration_test_kafka_sasl:9096"
+      KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/tmp/kraft-combined-logs-sasl"
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
 
+  # ── Kafka UI (monitors both clusters) ─────────────────────────────────────
   stream_api_kafka_ui:
     image: provectuslabs/kafka-ui:latest
     container_name: stream_api_kafka_ui
-    networks: [stream_net]
+    networks: [stream_net_combined]
     depends_on:
       - stream_api_integration_test_kafka
+      - stream_api_integration_test_kafka_sasl
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      # Connect inside the Docker network to the internal listener
+      KAFKA_CLUSTERS_0_NAME: plain
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: stream_api_integration_test_kafka:9092
+      KAFKA_CLUSTERS_1_NAME: sasl
+      KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS: stream_api_integration_test_kafka_sasl:9095
+      KAFKA_CLUSTERS_1_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      KAFKA_CLUSTERS_1_PROPERTIES_SASL_MECHANISM: PLAIN
+      KAFKA_CLUSTERS_1_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";'
       DYNAMIC_CONFIG_ENABLED: "true"
 
 networks:
-  stream_net:
+  stream_net_combined:
     driver: bridge
-

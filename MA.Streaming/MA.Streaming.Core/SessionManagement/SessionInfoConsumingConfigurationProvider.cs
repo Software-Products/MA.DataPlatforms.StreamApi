@@ -19,12 +19,12 @@ using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Contracts;
+using MA.Streaming.Core.Routing;
 
 namespace MA.Streaming.Core.SessionManagement;
 
 public class SessionInfoConsumingConfigurationProvider : IConsumingConfigurationProvider
 {
-    
     protected readonly IStreamingApiConfiguration StreamApiConfig;
     private readonly KafkaRouteInfo kafkaRouteInfo;
 
@@ -34,7 +34,6 @@ public class SessionInfoConsumingConfigurationProvider : IConsumingConfiguration
     {
         this.StreamApiConfig = streamingApiConfigurationProvider.Provide();
         this.kafkaRouteInfo = kafkaRouteInfoCreator.CreateSessionInfoRouteInfo();
-        
     }
 
     public ConsumingConfiguration Provide()
@@ -43,11 +42,12 @@ public class SessionInfoConsumingConfigurationProvider : IConsumingConfiguration
         var kafkaSubscriptionConfigs = new List<KafkaConsumingConfig>
         {
             new(
-                new KafkaListeningConfig(
+                KafkaListeningConfigCreator.Create(
                     this.StreamApiConfig.BrokerUrl,
                     $"Session_Info_Consuming_{Guid.NewGuid()}",
                     AutoOffsetResetMode.Earliest,
-                    0),
+                    0,
+                    statisticsIntervalMs: this.StreamApiConfig.EnableRouterConsumeMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 sessionRoute,
                 new KafkaTopicMetaData(sessionRoute.Topic, 1))
         };

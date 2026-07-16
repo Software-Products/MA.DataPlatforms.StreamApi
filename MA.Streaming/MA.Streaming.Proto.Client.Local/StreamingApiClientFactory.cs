@@ -27,13 +27,15 @@ public static class StreamingApiClientFactory
         ICancellationTokenSourceProvider cancellationTokenSourceProvider,
         IKafkaBrokerAvailabilityChecker kafkaBrokerAvailabilityChecker,
         ILoggingDirectoryProvider loggingDirectoryProvider,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IKafkaSecurityConfigurationProvider? kafkaSecurityConfigProvider = null)
     {
         return new StreamingApiClient(
             streamingApiConfiguration,
             cancellationTokenSourceProvider,
             kafkaBrokerAvailabilityChecker,
             loggingDirectoryProvider,
-            logger,null,null);
+            logger,
+            kafkaSecurityConfigProvider: kafkaSecurityConfigProvider);
     }
 }

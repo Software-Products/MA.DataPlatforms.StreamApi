@@ -23,14 +23,14 @@
 // Then listens for GetSessionStartNotification / GetSessionStopNotification.
 //
 // When a session is detected (existing or new):
-//   – prints a dedicated "Session Detected" block immediately
+//   � prints a dedicated "Session Detected" block immediately
 //
 // Every 5 s:
-//   – prints a compact statistics table (packet-type counts per active session
+//   � prints a compact statistics table (packet-type counts per active session
 //     + process thread count)
 //
 // When a session stops:
-//   – prints a "Session Ended" block with final totals
+//   � prints a "Session Ended" block with final totals
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -59,7 +59,7 @@ public sealed class LiveSessionMonitor
         this.dataSource = dataSource;
     }
 
-    // ── entry point ────────────────────────────────────────────────────────────
+    // -- entry point ------------------------------------------------------------
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         Console.WriteLine($"Monitoring  data-source = {this.dataSource}");
@@ -68,7 +68,7 @@ public sealed class LiveSessionMonitor
 
         var sessionMgmt = this.client.GetSessionManagementClient();
 
-        // ── register notification streams BEFORE querying current sessions ─────
+        // -- register notification streams BEFORE querying current sessions -----
         // This order avoids a race: if a session starts between the query and the
         // listener registering, we would miss it.  With the listener already open,
         // the notification arrives and we de-duplicate against activeSessions.
@@ -80,7 +80,7 @@ public sealed class LiveSessionMonitor
             new GetSessionStopNotificationRequest { DataSource = this.dataSource },
             cancellationToken: cancellationToken);
 
-        // ── seed with sessions already running ─────────────────────────────────
+        // -- seed with sessions already running ---------------------------------
         try
         {
             var current = sessionMgmt.GetCurrentSessions(
@@ -96,7 +96,7 @@ public sealed class LiveSessionMonitor
             Console.WriteLine($"[!] Could not query current sessions: {ex.Message}");
         }
 
-        // ── run all background tasks ───────────────────────────────────────────
+        // -- run all background tasks -------------------------------------------
         await Task.WhenAll(
             this.ListenForStartsAsync(startStream, sessionMgmt, cancellationToken),
             this.ListenForStopsAsync(stopStream, sessionMgmt, cancellationToken),
@@ -106,7 +106,7 @@ public sealed class LiveSessionMonitor
         stopStream.Dispose();
     }
 
-    // ── notification listeners ─────────────────────────────────────────────────
+    // -- notification listeners -------------------------------------------------
     private async Task ListenForStartsAsync(
         AsyncServerStreamingCall<GetSessionStartNotificationResponse> stream,
         SessionManagementService.SessionManagementServiceClient sessionMgmt,
@@ -148,7 +148,7 @@ public sealed class LiveSessionMonitor
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled) { }
     }
 
-    // ── session attach (shared by seed + start-notification) ──────────────────
+    // -- session attach (shared by seed + start-notification) ------------------
     private void AttachSession(
         string sessionKey,
         string origin,
@@ -169,7 +169,7 @@ public sealed class LiveSessionMonitor
         this.PrintSessionDetected(sessionKey, origin, sessionMgmt);
     }
 
-    // ── immediate print: session detected ─────────────────────────────────────
+    // -- immediate print: session detected -------------------------------------
     private void PrintSessionDetected(
         string sessionKey,
         string origin,
@@ -180,69 +180,69 @@ public sealed class LiveSessionMonitor
         {
             info = sessionMgmt.GetSessionInfo(new GetSessionInfoRequest { SessionKey = sessionKey });
         }
-        catch { /* info stays null — not fatal */ }
+        catch { /* info stays null � not fatal */ }
 
-        var line = new string('─', Width);
+        var line = new string('-', Width);
         Console.WriteLine();
-        Console.WriteLine($"┌{line}┐");
-        Console.WriteLine($"│  ✦ SESSION DETECTED {origin,-37}│");
-        Console.WriteLine($"├{line}┤");
-        Console.WriteLine($"│  Key        : {sessionKey,-45}│");
+        Console.WriteLine($"+{line}+");
+        Console.WriteLine($"�  ? SESSION DETECTED {origin,-37}�");
+        Console.WriteLine($"+{line}�");
+        Console.WriteLine($"�  Key        : {sessionKey,-45}�");
 
         if (info?.Success == true)
         {
-            Console.WriteLine($"│  Identifier : {(string.IsNullOrEmpty(info.Identifier) ? "(none)" : info.Identifier),-45}│");
-            Console.WriteLine($"│  Type       : {(string.IsNullOrEmpty(info.Type) ? "(none)" : info.Type),-45}│");
-            Console.WriteLine($"│  Version    : {info.Version,-45}│");
-            Console.WriteLine($"│  DataSource : {(string.IsNullOrEmpty(info.DataSource) ? this.dataSource : info.DataSource),-45}│");
+            Console.WriteLine($"�  Identifier : {(string.IsNullOrEmpty(info.Identifier) ? "(none)" : info.Identifier),-45}�");
+            Console.WriteLine($"�  Type       : {(string.IsNullOrEmpty(info.Type) ? "(none)" : info.Type),-45}�");
+            Console.WriteLine($"�  Version    : {info.Version,-45}�");
+            Console.WriteLine($"�  DataSource : {(string.IsNullOrEmpty(info.DataSource) ? this.dataSource : info.DataSource),-45}�");
 
             foreach (var kv in info.Details)
             {
                 var label = kv.Key.Length > 10 ? kv.Key[..10] : kv.Key;
-                Console.WriteLine($"│  {label,-11}: {kv.Value,-45}│");
+                Console.WriteLine($"�  {label,-11}: {kv.Value,-45}�");
             }
         }
         else
         {
-            Console.WriteLine($"│  DataSource : {this.dataSource,-45}│");
+            Console.WriteLine($"�  DataSource : {this.dataSource,-45}�");
         }
 
-        Console.WriteLine($"│  Detected   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}  {origin,-29}│");
-        Console.WriteLine($"└{line}┘");
-        Console.WriteLine($"  Reading packets… statistics update every {StatsIntervalSeconds} s");
+        Console.WriteLine($"�  Detected   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}  {origin,-29}�");
+        Console.WriteLine($"+{line}+");
+        Console.WriteLine($"  Reading packets� statistics update every {StatsIntervalSeconds} s");
         Console.WriteLine();
     }
 
-    // ── immediate print: session ended ────────────────────────────────────────
+    // -- immediate print: session ended ----------------------------------------
     private void PrintSessionEnded(
         SessionReader reader,
         SessionManagementService.SessionManagementServiceClient sessionMgmt)
     {
-        var line = new string('─', Width);
+        var line = new string('-', Width);
         Console.WriteLine();
-        Console.WriteLine($"┌{line}┐");
-        Console.WriteLine($"│  ✦ SESSION ENDED{new string(' ', Width - 16)}│");
-        Console.WriteLine($"├{line}┤");
-        Console.WriteLine($"│  Key      : {reader.SessionKey,-47}│");
-        Console.WriteLine($"│  Ended    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}{new string(' ', 28)}│");
-        Console.WriteLine($"├{line}┤");
-        Console.WriteLine($"│  Final packet counts:{new string(' ', Width - 21)}│");
+        Console.WriteLine($"+{line}+");
+        Console.WriteLine($"�  ? SESSION ENDED{new string(' ', Width - 16)}�");
+        Console.WriteLine($"+{line}�");
+        Console.WriteLine($"�  Key      : {reader.SessionKey,-47}�");
+        Console.WriteLine($"�  Ended    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}{new string(' ', 28)}�");
+        Console.WriteLine($"+{line}�");
+        Console.WriteLine($"�  Final packet counts:{new string(' ', Width - 21)}�");
 
         foreach (var (type, count) in reader.TypeCounts.OrderByDescending(x => x.Value))
         {
-            Console.WriteLine($"│    {type,-24}  {count,10:N0} packets{new string(' ', Width - 44)}│");
+            Console.WriteLine($"�    {type,-24}  {count,10:N0} packets{new string(' ', Width - 44)}�");
         }
 
         if (reader.TypeCounts.IsEmpty)
         {
-            Console.WriteLine($"│    (no packets received){new string(' ', Width - 25)}│");
+            Console.WriteLine($"�    (no packets received){new string(' ', Width - 25)}�");
         }
 
-        Console.WriteLine($"└{line}┘");
+        Console.WriteLine($"+{line}+");
         Console.WriteLine();
     }
 
-    // ── periodic statistics ────────────────────────────────────────────────────
+    // -- periodic statistics ----------------------------------------------------
     private async Task PrintStatsLoopAsync(CancellationToken ct)
     {
         try
@@ -262,7 +262,7 @@ public sealed class LiveSessionMonitor
             .Where(r => r != null)
             .ToArray();
 
-        // Drain closed sessions — shown once then discarded.
+        // Drain closed sessions � shown once then discarded.
         var closed = new List<SessionReader>();
         while (this.closedSessions.TryDequeue(out var r))
         {
@@ -275,10 +275,10 @@ public sealed class LiveSessionMonitor
             return;
         }
 
-        var border = new string('═', Width);
-        Console.WriteLine($"╔══ Statistics @ {DateTime.Now:HH:mm:ss} {new string('═', Width - 22)}╗");
-        Console.WriteLine($"║  Threads : {Process.GetCurrentProcess().Threads.Count,-48}║");
-        Console.WriteLine($"║  Active  : {active.Length,-48}║");
+        var border = new string('-', Width);
+        Console.WriteLine($"+-- Statistics @ {DateTime.Now:HH:mm:ss} {new string('-', Width - 22)}+");
+        Console.WriteLine($"�  Threads : {Process.GetCurrentProcess().Threads.Count,-48}�");
+        Console.WriteLine($"�  Active  : {active.Length,-48}�");
 
         foreach (var r in active)
         {
@@ -290,32 +290,32 @@ public sealed class LiveSessionMonitor
             PrintSessionRow(r, "stopped");
         }
 
-        Console.WriteLine($"╚{border}╝");
+        Console.WriteLine($"+{border}+");
         Console.WriteLine();
 
         void PrintSessionRow(SessionReader r, string status)
         {
-            Console.WriteLine($"╠{border}╣");
-            var header = $"  {r.SessionKey[..Math.Min(8, r.SessionKey.Length)]}…  [{status}]";
-            Console.WriteLine($"║{header,-Width}║");
+            Console.WriteLine($"�{border}�");
+            var header = $"  {r.SessionKey[..Math.Min(8, r.SessionKey.Length)]}�  [{status}]";
+            Console.WriteLine($"�{header,-Width}�");
 
             var counts = r.TypeCounts.OrderByDescending(x => x.Value).ToArray();
             if (counts.Length == 0)
             {
-                Console.WriteLine($"║  {"(waiting for packets...)",-Width - 2}  ║");
+                Console.WriteLine($"�  {"(waiting for packets...)",-Width - 2}  �");
             }
             else
             {
                 foreach (var (type, count) in counts)
                 {
                     var row = $"    {type,-24}  {count,10:N0} packets";
-                    Console.WriteLine($"║{row,-Width}║");
+                    Console.WriteLine($"�{row,-Width}�");
                 }
             }
         }
     }
 
-    // ── inner: per-session packet reader ──────────────────────────────────────
+    // -- inner: per-session packet reader --------------------------------------
     private sealed class SessionReader
     {
         private readonly StreamingApiClient client;
@@ -353,7 +353,7 @@ public sealed class LiveSessionMonitor
             }
             catch (TimeoutException)
             {
-                Console.WriteLine($"  [!] Reader for {this.SessionKey[..8]}… did not stop within 5 s");
+                Console.WriteLine($"  [!] Reader for {this.SessionKey[..8]}� did not stop within 5 s");
             }
         }
 
@@ -365,8 +365,8 @@ public sealed class LiveSessionMonitor
 
             try
             {
-                // Omitting Streams → server returns ALL streams for this session.
-                // Omitting StreamOffsets → each stream starts from offset 0 (Earliest),
+                // Omitting Streams ? server returns ALL streams for this session.
+                // Omitting StreamOffsets ? each stream starts from offset 0 (Earliest),
                 // so the monitor counts every packet from session start.
                 // MainOffset default 0 = Earliest for the main stream too.
                 var connection = await connMgr.NewConnectionAsync(
@@ -377,7 +377,7 @@ public sealed class LiveSessionMonitor
                             DataSource = this.DataSource,
                             SessionKey = this.SessionKey,
                             ExcludeMainStream = false
-                            // Streams intentionally omitted → reads all streams
+                            // Streams intentionally omitted ? reads all streams
                         }
                     },
                     cancellationToken: ct);
@@ -402,7 +402,7 @@ public sealed class LiveSessionMonitor
             catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled) { }
             catch (Exception ex)
             {
-                Console.WriteLine($"  [!] Reader error for {this.SessionKey[..8]}…: {ex.Message}");
+                Console.WriteLine($"  [!] Reader error for {this.SessionKey[..8]}�: {ex.Message}");
             }
             finally
             {

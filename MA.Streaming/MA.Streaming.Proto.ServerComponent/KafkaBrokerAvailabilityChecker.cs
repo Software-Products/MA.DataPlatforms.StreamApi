@@ -19,7 +19,9 @@ using Confluent.Kafka;
 
 using MA.Common;
 using MA.Common.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Shared.Core;
 using MA.Streaming.Abstraction;
+using MA.Streaming.Core;
 
 namespace MA.Streaming.Proto.ServerComponent;
 
@@ -31,9 +33,8 @@ public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
     private readonly Func<string, IAdminClient> adminClientFactory;
     private readonly double timeBetweenRetriesSeconds;
 
-    public KafkaBrokerAvailabilityChecker()
-        : this(
-            brokerUrl => new AdminClientBuilder(new AdminClientConfig { BootstrapServers = brokerUrl }).Build())
+    public KafkaBrokerAvailabilityChecker(IKafkaSecurityConfigurationProvider? securityConfigProvider = null)
+        : this(CreateAdminClientFactory(securityConfigProvider))
     {
     }
 
@@ -41,6 +42,19 @@ public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
     {
         this.adminClientFactory = adminClientFactory;
         this.timeBetweenRetriesSeconds = timeBetweenRetriesSeconds;
+    }
+
+    private static Func<string, IAdminClient> CreateAdminClientFactory(IKafkaSecurityConfigurationProvider? securityConfigProvider)
+    {
+        return brokerUrl =>
+        {
+            var config = new AdminClientConfig
+            {
+                BootstrapServers = brokerUrl
+            };
+            KafkaSecurityApplier.Apply(config, KafkaSecurityConfigurationMapper.Map(securityConfigProvider?.Provide()));
+            return new AdminClientBuilder(config).Build();
+        };
     }
 
     public bool Check(string brokerUrl, ILogger? logger = null)
@@ -82,7 +96,8 @@ public class KafkaBrokerAvailabilityChecker : IKafkaBrokerAvailabilityChecker
                     var stateChanged = isAvailable != wasAvailable;
                     wasAvailable = isAvailable;
 
-                    if (!stateChanged && !cancellationTokenSource.IsCancellationRequested)
+                    if (!stateChanged &&
+                        !cancellationTokenSource.IsCancellationRequested)
                     {
                         await Task.Delay(TimeSpan.FromSeconds(this.timeBetweenRetriesSeconds), cancellationTokenSource.Token);
                     }

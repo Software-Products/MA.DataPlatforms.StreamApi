@@ -16,6 +16,7 @@
 // </copyright>
 
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.Streaming.Abstraction;
 
 namespace MA.Streaming.Core.DataFormatManagement;
@@ -25,6 +26,7 @@ public class DataSourcesRepository : IDataSourcesRepository
     private readonly IKafkaTopicHelper kafkaTopicHelper;
     private readonly IDomainKafkaRouteMappingInfoCreator domainKafkaRouteMappingInfoCreator;
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
 
     private readonly object readWriteLock = new();
     private HashSet<string> trackedTopics = [];
@@ -34,11 +36,13 @@ public class DataSourcesRepository : IDataSourcesRepository
     public DataSourcesRepository(
         IKafkaTopicHelper kafkaTopicHelper,
         IStreamingApiConfigurationProvider streamingApiConfigurationProvider,
-        IDomainKafkaRouteMappingInfoCreator domainKafkaRouteMappingInfoCreator)
+        IDomainKafkaRouteMappingInfoCreator domainKafkaRouteMappingInfoCreator,
+        IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.kafkaTopicHelper = kafkaTopicHelper;
         this.domainKafkaRouteMappingInfoCreator = domainKafkaRouteMappingInfoCreator;
         this.streamingApiConfiguration = streamingApiConfigurationProvider.Provide();
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider;
     }
 
     public event EventHandler<string>? DataSourceAdded;
@@ -79,7 +83,7 @@ public class DataSourcesRepository : IDataSourcesRepository
         lock (this.readWriteLock)
         {
             var essentialsPrefix = this.domainKafkaRouteMappingInfoCreator.CreateEssentialTopicName("").Topic;
-            var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.streamingApiConfiguration.BrokerUrl, essentialsPrefix);
+            var essentialTopics = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.streamingApiConfiguration.BrokerUrl, essentialsPrefix, this.kafkaSecurityConfigProvider.Provide());
             this.trackedTopics = essentialTopics
                 .Select(i => i.TopicName.Replace(essentialsPrefix, string.Empty)).Distinct().ToHashSet();
             this.initiated = true;

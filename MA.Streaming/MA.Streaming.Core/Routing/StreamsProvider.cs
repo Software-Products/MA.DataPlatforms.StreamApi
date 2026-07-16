@@ -18,6 +18,8 @@
 using System.Text.RegularExpressions;
 
 using MA.DataPlatforms.Secu4.KafkaMetadataComponent;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
+using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.Streaming.Abstraction;
 using MA.Streaming.Core.Abstractions;
 
@@ -28,14 +30,16 @@ public class StreamsProvider : IStreamsProvider
     private readonly IKafkaTopicHelper kafkaTopicHelper;
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration configuration;
+    private readonly KafkaSecurityConfig? securityConfig;
     private List<string> lastStreams;
     private DateTime lastUpdateTime;
 
-    public StreamsProvider(IStreamingApiConfigurationProvider apiConfigurationProvider, IKafkaTopicHelper kafkaTopicHelper, IKafkaRouteInfoCreator kafkaRouteInfoCreator)
+    public StreamsProvider(IStreamingApiConfigurationProvider apiConfigurationProvider, IKafkaTopicHelper kafkaTopicHelper, IKafkaRouteInfoCreator kafkaRouteInfoCreator, IKafkaSecurityConfigProvider kafkaSecurityConfigProvider)
     {
         this.kafkaTopicHelper = kafkaTopicHelper;
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.configuration = apiConfigurationProvider.Provide();
+        this.securityConfig = kafkaSecurityConfigProvider.Provide();
         this.lastUpdateTime = DateTime.MinValue;
         this.lastStreams = [];
     }
@@ -58,7 +62,7 @@ public class StreamsProvider : IStreamsProvider
         }
 
         var mainDataSourceRouteInfo = this.kafkaRouteInfoCreator.CreateMainRouteInfo(dataSource);
-        var topicInfos = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.configuration.BrokerUrl, mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic);
+        var topicInfos = this.kafkaTopicHelper.GetInfoByTopicPrefix(this.configuration.BrokerUrl, mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic, this.securityConfig);
         var pattern = $@"^{mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic}\.(.+)$";
         var res = topicInfos.Where(i => Regex.Match(i.TopicName, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).Success)
             .Select(foundTopicInfo => foundTopicInfo.TopicName.Replace($"{mainDataSourceRouteInfo.KafkaRouteTopicInfo.Topic}.", ""))

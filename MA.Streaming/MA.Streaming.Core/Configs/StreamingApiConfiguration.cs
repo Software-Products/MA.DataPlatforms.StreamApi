@@ -22,9 +22,9 @@ namespace MA.Streaming.Core.Configs;
 public class StreamingApiConfiguration : IStreamingApiConfiguration
 {
     public StreamingApiConfiguration(
-        StreamCreationStrategy? streamCreationStrategy,
-        string? brokerUrl,
-        IReadOnlyList<PartitionMapping>? partitionMappings,
+        StreamCreationStrategy? streamCreationStrategy = null,
+        string? brokerUrl = null,
+        IReadOnlyList<PartitionMapping>? partitionMappings = null,
         int? streamApiPort = 13579,
         bool? integrateSessionManagement = true,
         bool? integrateDataFormatManagement = true,
@@ -36,8 +36,24 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         string? domain = null,
         int? batchingSizesKb = null,
         int? batchingTimeMs = null,
-        bool? enableGrpcReflection = false)
+        bool? enableGrpcReflection = false,
+        string? kafkaBrokerPublishingConfigFilePath = null,
+        string? kafkaBrokerConsumingConfigFilePath = null,
+        string? kafkaBrokerConfigWhitelistFilePath = null,
+        KafkaSecurityConfiguration? security = null,
+        bool? enableRouterPublishMetrics = false,
+        bool? enableRouterConsumeMetrics = false)
     {
+        this.KafkaBrokerPublishingConfigFilePath = kafkaBrokerPublishingConfigFilePath != null
+            ? kafkaBrokerPublishingConfigFilePath.EndsWith("json", StringComparison.Ordinal)
+                ? kafkaBrokerPublishingConfigFilePath
+                : $"{kafkaBrokerPublishingConfigFilePath}.json"
+            : "kafka-publisher-broker.json";
+        this.KafkaBrokerConsumingConfigFilePath = kafkaBrokerConsumingConfigFilePath != null
+            ? kafkaBrokerConsumingConfigFilePath.EndsWith("json", StringComparison.Ordinal)
+                ? kafkaBrokerConsumingConfigFilePath
+                : $"{kafkaBrokerConsumingConfigFilePath}.json"
+            : "kafka-consumer-broker.json";
         this.StreamCreationStrategy = streamCreationStrategy ?? StreamCreationStrategy.PartitionBased;
         this.BrokerUrl = brokerUrl ?? "localhost:9092";
         this.PartitionMappings = partitionMappings ?? [];
@@ -53,6 +69,14 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
         this.BatchingSizesKb = batchingSizesKb ?? 4 * 1024;
         this.BatchingTimeMs = batchingTimeMs ?? 50;
         this.EnableGrpcReflection = enableGrpcReflection ?? false;
+        this.KafkaBrokerConfigWhitelistFilePath = kafkaBrokerConfigWhitelistFilePath != null
+            ? kafkaBrokerConfigWhitelistFilePath.EndsWith("json", StringComparison.Ordinal)
+                ? kafkaBrokerConfigWhitelistFilePath
+                : $"{kafkaBrokerConfigWhitelistFilePath}.json"
+            : "kafka-broker-whitelist.json";
+        this.Security = security;
+        this.EnableRouterPublishMetrics = enableRouterPublishMetrics ?? false;
+        this.EnableRouterConsumeMetrics = enableRouterConsumeMetrics ?? false;
     }
 
     public StreamCreationStrategy StreamCreationStrategy { get; }
@@ -83,5 +107,17 @@ public class StreamingApiConfiguration : IStreamingApiConfiguration
 
     public int BatchingTimeMs { get; }
 
-    public bool EnableGrpcReflection { get; }   
+    public bool EnableGrpcReflection { get; }
+
+    public string KafkaBrokerPublishingConfigFilePath { get; }
+
+    public string KafkaBrokerConsumingConfigFilePath { get; }
+
+    public string KafkaBrokerConfigWhitelistFilePath { get; }
+
+    public KafkaSecurityConfiguration? Security { get; set; }
+
+    public bool EnableRouterPublishMetrics { get; }
+
+    public bool EnableRouterConsumeMetrics { get; }
 }

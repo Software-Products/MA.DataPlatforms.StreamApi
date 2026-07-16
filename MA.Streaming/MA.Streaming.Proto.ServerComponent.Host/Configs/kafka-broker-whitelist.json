@@ -1,0 +1,16 @@
+{
+  "Publish": [
+    { "Pattern": "compression.type",             "Allow": true  },
+    { "Pattern": "linger.ms",                    "Allow": true  },
+    { "Pattern": "batch.size",                   "Allow": true  },
+    { "Pattern": "queue.buffering.max.messages", "Allow": true  },
+    { "Pattern": "queue.buffering.max.kbytes",   "Allow": true  },
+    { "Pattern": "message.max.bytes",            "Allow": true  },
+    { "Pattern": "message.timeout.ms",           "Allow": true  },
+    { "Pattern": "*",                            "Allow": false }
+  ],
+  "Consume": [
+    { "Pattern": "session.timeout.ms",           "Allow": true  },
+    { "Pattern": "*",                            "Allow": false }
+  ]
+}

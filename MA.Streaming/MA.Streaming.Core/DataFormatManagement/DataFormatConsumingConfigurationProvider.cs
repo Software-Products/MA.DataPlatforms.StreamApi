@@ -18,6 +18,7 @@
 using MA.DataPlatforms.Secu4.Routing.Contracts;
 using MA.DataPlatforms.Secu4.Routing.Shared.Abstractions;
 using MA.Streaming.Abstraction;
+using MA.Streaming.Core.Routing;
 
 namespace MA.Streaming.Core.DataFormatManagement;
 
@@ -37,11 +38,12 @@ public class DataFormatConsumingConfigurationProvider : IConsumingConfigurationP
     public ConsumingConfiguration Provide()
     {
         var subscriptionConfiguration = this.routes.Select(i => new KafkaConsumingConfig(
-            new KafkaListeningConfig(
+            KafkaListeningConfigCreator.Create(
                 this.StreamApiConfig.BrokerUrl,
                 $"Data_Format_Consuming_{Guid.NewGuid()}",
                 AutoOffsetResetMode.Earliest,
-                0),
+                0,
+                statisticsIntervalMs: this.StreamApiConfig.EnableRouterConsumeMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
             i,
             new KafkaTopicMetaData(i.Topic, 1))
         ).ToList();

@@ -116,7 +116,7 @@ public class GenericBufferTests
 
         var buffer = new GenericBuffer<string>(this.consumer, cts.Token, this.logger);
 
-        // Act â€” no exception should be thrown
+        // Act — no exception should be thrown
         buffer.AddData("should-not-arrive");
 
         // Give a brief window in case the consumer would be called
@@ -136,7 +136,7 @@ public class GenericBufferTests
         // Cancel right after creating the buffer
         await cts.CancelAsync();
 
-        // Act & Assert â€” must not throw
+        // Act & Assert — must not throw
         var exception = Record.Exception(() => buffer.AddData("test"));
         Assert.Null(exception);
     }
@@ -157,7 +157,7 @@ public class GenericBufferTests
         // Act
         await cts.CancelAsync();
 
-        // Assert â€” deterministic: wait until the catch block actually runs
+        // Assert — deterministic: wait until the catch block actually runs
         await logCalled.Task.WaitAsync(TimeSpan.FromSeconds(2));
         this.logger.Received().Info("Processing was canceled.");
     }
@@ -194,7 +194,7 @@ public class GenericBufferTests
         await badConsumed.Task.WaitAsync(TimeSpan.FromSeconds(2));
         buffer.AddData("good");
 
-        // Assert â€” loop is still alive; "good" is consumed
+        // Assert — loop is still alive; "good" is consumed
         await goodConsumed.Task.WaitAsync(TimeSpan.FromSeconds(2));
         this.logger.Received().Error(Arg.Is<string>(msg => msg.Contains("consumer error")));
 
@@ -208,7 +208,7 @@ public class GenericBufferTests
         using var cts = new CancellationTokenSource();
         var unused = new GenericBuffer<string>(this.consumer, cts.Token, this.logger);
 
-        // Act â€” add nothing
+        // Act — add nothing
         await Task.Delay(100);
 
         // Assert
@@ -220,7 +220,7 @@ public class GenericBufferTests
     [Fact]
     public async Task AddData_WhenCancellationOccursDuringWaitAsync_ProcessingStopsGracefully()
     {
-        // Arrange â€” the semaphore is never released so the background loop is blocked on WaitAsync
+        // Arrange — the semaphore is never released so the background loop is blocked on WaitAsync
         using var cts = new CancellationTokenSource();
         var logCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         this.logger.When(l => l.Info("Processing was canceled.")).Do(_ => logCalled.TrySetResult());
@@ -230,10 +230,10 @@ public class GenericBufferTests
         // Let the background task start and block on WaitAsync before we cancel
         await Task.Delay(50);
 
-        // Act â€” cancel while the background loop is blocked on the empty semaphore
+        // Act — cancel while the background loop is blocked on the empty semaphore
         await cts.CancelAsync();
 
-        // Assert â€” deterministic: wait until the catch block actually runs
+        // Assert — deterministic: wait until the catch block actually runs
         await logCalled.Task.WaitAsync(TimeSpan.FromSeconds(2));
         this.logger.Received().Info("Processing was canceled.");
     }
@@ -287,7 +287,7 @@ public class GenericBufferTests
             return Task.CompletedTask;
         });
 
-        // Act & Assert â€” no NullReferenceException
+        // Act & Assert — no NullReferenceException
         buffer.AddData("test");
         await received.Task.WaitAsync(TimeSpan.FromSeconds(2));
 

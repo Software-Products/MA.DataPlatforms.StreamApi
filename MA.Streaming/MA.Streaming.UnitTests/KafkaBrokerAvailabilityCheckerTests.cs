@@ -48,7 +48,7 @@ public class KafkaBrokerAvailabilityCheckerTests
         => new([], [], 0, string.Empty);
 
     // -------------------------------------------------------------------------
-    // Check â€” synchronous availability probe
+    // Check — synchronous availability probe
     // -------------------------------------------------------------------------
 
     [Fact]
@@ -97,18 +97,18 @@ public class KafkaBrokerAvailabilityCheckerTests
     }
 
     // -------------------------------------------------------------------------
-    // CheckContinuously â€” background monitoring loop
+    // CheckContinuously — background monitoring loop
     // -------------------------------------------------------------------------
 
     [Fact]
     public async Task CheckContinuously_WhenBrokerAlwaysAvailable_NeverLogsAvailableAgain()
     {
-        // Arrange â€” every call returns at least one broker
+        // Arrange — every call returns at least one broker
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(BrokersAvailable());
         using var cts = new CancellationTokenSource();
         var sut = this.CreateSut();
 
-        // Act â€” let a few iterations run then cancel
+        // Act — let a few iterations run then cancel
         var task = sut.CheckContinuously("broker:9092", cts, this.logger);
         await Task.Delay(250);
         await cts.CancelAsync();
@@ -122,7 +122,7 @@ public class KafkaBrokerAvailabilityCheckerTests
     public async Task CheckContinuously_WhenBrokerInitiallyUnavailableAndBecomesAvailable_LogsAvailableAgain()
     {
         // Arrange
-        // Sequence: initial check â†’ unavailable; loop check 1 â†’ unavailable; loop check 2 â†’ available
+        // Sequence: initial check ? unavailable; loop check 1 ? unavailable; loop check 2 ? available
         var callCount = 0;
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(_ =>
         {
@@ -150,7 +150,7 @@ public class KafkaBrokerAvailabilityCheckerTests
     public async Task CheckContinuously_WhenBrokerGoesDownThenRecovers_LogsAvailableAgainOnlyOnRecovery()
     {
         // Arrange
-        // Sequence: available Ã— 2, unavailable Ã— 2, available again
+        // Sequence: available × 2, unavailable × 2, available again
         var callCount = 0;
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(_ =>
         {
@@ -173,14 +173,14 @@ public class KafkaBrokerAvailabilityCheckerTests
         await cts.CancelAsync();
         await task.ContinueWith(_ => { });
 
-        // Assert â€” logged exactly once (on recovery), never for the down-transition
+        // Assert — logged exactly once (on recovery), never for the down-transition
         this.logger.Received(1).Info("Kafka broker is available again");
     }
 
     [Fact]
     public async Task CheckContinuously_WhenBrokerAlwaysUnavailable_NeverLogsAvailableAgain()
     {
-        // Arrange â€” every call throws (simulates completely unreachable broker)
+        // Arrange — every call throws (simulates completely unreachable broker)
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(_ => throw new KafkaException(ErrorCode.BrokerNotAvailable));
         using var cts = new CancellationTokenSource();
         var sut = this.CreateSut();
@@ -198,7 +198,7 @@ public class KafkaBrokerAvailabilityCheckerTests
     [Fact]
     public async Task CheckContinuously_WhenCancelledWhileDelayingBetweenRetries_TaskCompletesCleanly()
     {
-        // Arrange â€” broker always available so the loop always hits the delay path
+        // Arrange — broker always available so the loop always hits the delay path
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(BrokersAvailable());
         using var cts = new CancellationTokenSource();
         var sut = this.CreateSut();
@@ -210,7 +210,7 @@ public class KafkaBrokerAvailabilityCheckerTests
         await Task.Delay(30);
         await cts.CancelAsync();
 
-        // Assert â€” task should finish (cancelled or ran-to-completion) within a reasonable timeout
+        // Assert — task should finish (cancelled or ran-to-completion) within a reasonable timeout
         var completed = await Task.WhenAny(task.ContinueWith(_ => { }), Task.Delay(2000));
         Assert.NotEqual(Task.Delay(2000), completed);
     }
@@ -218,7 +218,7 @@ public class KafkaBrokerAvailabilityCheckerTests
     [Fact]
     public async Task CheckContinuously_WhenStateChangesRepeatedly_LogsAvailableAgainEachTimeItRecovers()
     {
-        // Arrange â€” alternates unavailable / available so broker "comes back" twice
+        // Arrange — alternates unavailable / available so broker "comes back" twice
         // Sequence: unavailable(1), available(2) [log], unavailable(3), available(4) [log], ...
         var callCount = 0;
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(_ =>
@@ -246,14 +246,14 @@ public class KafkaBrokerAvailabilityCheckerTests
         await cts.CancelAsync();
         await task.ContinueWith(_ => { });
 
-        // Assert â€” logged at least twice (once per recovery)
+        // Assert — logged at least twice (once per recovery)
         Assert.True(logCount >= 2);
     }
 
     [Fact]
     public async Task CheckContinuously_WhenPassingNullLogger_DoesNotThrow()
     {
-        // Arrange â€” null logger; broker becomes available so the internal log call is attempted
+        // Arrange — null logger; broker becomes available so the internal log call is attempted
         var callCount = 0;
         this.adminClient.GetMetadata(Arg.Any<TimeSpan>()).Returns(_ =>
         {

@@ -19,11 +19,12 @@
 		<InternalsVisibleTo Include="MA.Streaming.UnitTests" />
 	</ItemGroup>
 
+
 	<ItemGroup>
-		<PackageReference Include="MA.DataPlatforms.Secu4.KafkaMetadataComponent" Version="2.1.2.2" />
-		<PackageReference Include="MA.DataPlatforms.Secu4.RouterComponent" Version="2.1.2.2" />
-		<PackageReference Include="MA.DataPlatforms.Secu4.RouteReaderComponent" Version="2.1.2.2" />
-		<PackageReference Include="MA.DataPlatforms.Secu4.RouteSubscriberComponent" Version="2.1.2.2" />
+		<PackageReference Include="MA.DataPlatforms.Secu4.KafkaMetadataComponent" Version="2.1.3.10" />
+		<PackageReference Include="MA.DataPlatforms.Secu4.RouterComponent" Version="2.1.3.10" />
+		<PackageReference Include="MA.DataPlatforms.Secu4.RouteSubscriberComponent" Version="2.1.3.10" />
+		<PackageReference Include="MA.DataPlatforms.Secu4.Routing.Configuration" Version="2.1.3.10" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -15,7 +15,10 @@
 // limitations under the License.
 // </copyright>
 
+using MA.Common.Abstractions;
+using MA.DataPlatforms.Secu4.Routing.Configuration.Core;
 using MA.DataPlatforms.Secu4.Routing.Contracts;
+using MA.DataPlatforms.Secu4.RouterComponent.Abstractions;
 using MA.Streaming.Abstraction;
 
 namespace MA.Streaming.Core.Routing.TopicsRouting;
@@ -24,18 +27,24 @@ public class TopicBasedRoutingConfigurationProviderCreator
 {
     private readonly IKafkaRouteInfoCreator kafkaRouteInfoCreator;
     private readonly IStreamingApiConfiguration streamingApiConfiguration;
-    private readonly Dictionary<string, RoutingConfigurationProvider> configurationProviders = new();
+    private readonly IKafkaSecurityConfigProvider kafkaSecurityConfigProvider;
+    private readonly ILogger? logger;
+    private readonly Dictionary<string, IRoutingConfigurationProvider> configurationProviders = new();
     private readonly object readWriteLock = new();
 
     public TopicBasedRoutingConfigurationProviderCreator(
         IKafkaRouteInfoCreator kafkaRouteInfoCreator,
-        IStreamingApiConfiguration streamingApiConfiguration)
+        IStreamingApiConfiguration streamingApiConfiguration,
+        IKafkaSecurityConfigProvider? kafkaSecurityConfigProvider = null,
+        ILogger? logger = null)
     {
         this.kafkaRouteInfoCreator = kafkaRouteInfoCreator;
         this.streamingApiConfiguration = streamingApiConfiguration;
+        this.kafkaSecurityConfigProvider = kafkaSecurityConfigProvider ?? new EmptyKafkaSecurityConfigProvider();
+        this.logger = logger;
     }
 
-    public RoutingConfigurationProvider Create(string dataSource, string stream)
+    public IRoutingConfigurationProvider Create(string dataSource, string stream)
     {
         lock (this.readWriteLock)
         {
@@ -45,13 +54,13 @@ public class TopicBasedRoutingConfigurationProviderCreator
                 return existingProvider;
             }
 
-            var configurationProvider = this.CreateConfigurationProvider(dataSource, stream);
-            this.configurationProviders[routeStreamInfo.KafkaRouteTopicInfo.Topic] = configurationProvider;
-            return configurationProvider;
+            var provider = this.CreateConfigurationProvider(dataSource, stream);
+            this.configurationProviders[routeStreamInfo.KafkaRouteTopicInfo.Topic] = provider;
+            return provider;
         }
     }
 
-    private RoutingConfigurationProvider CreateConfigurationProvider(string dataSource, string stream)
+    private IRoutingConfigurationProvider CreateConfigurationProvider(string dataSource, string stream)
     {
         var deadLetterRouteInfo = this.kafkaRouteInfoCreator.CreateDeadLetterRouteInfo();
         var streamDataRouterInfo = this.kafkaRouteInfoCreator.CreateStreamRouteInfo(dataSource, stream);
@@ -65,10 +74,18 @@ public class TopicBasedRoutingConfigurationProviderCreator
         };
         var configuration = new RoutingConfiguration(
             new KafkaRoutingConfig(
-                KafkaPublishingConfigCreator.Create(this.streamingApiConfiguration.BrokerUrl),
+                KafkaPublishingConfigCreator.Create(this.streamingApiConfiguration.BrokerUrl, this.streamingApiConfiguration.EnableRouterPublishMetrics ? KafkaPublishingConfigCreator.EnabledStatisticsIntervalMs : 0),
                 routes,
                 metaData,
-                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic));
-        return new RoutingConfigurationProvider(configuration);
+                deadLetterRouteInfo.KafkaRouteTopicInfo.Topic,
+                this.kafkaSecurityConfigProvider.Provide()));
+
+        IRoutingConfigurationProvider provider = new RoutingConfigurationProvider(configuration);
+        return RoutingConfigurationProviderCreator.ApplyFileOverride(
+            provider,
+            this.streamingApiConfiguration.KafkaBrokerPublishingConfigFilePath,
+            this.kafkaSecurityConfigProvider,
+            this.logger,
+            this.streamingApiConfiguration.KafkaBrokerConfigWhitelistFilePath);
     }
 }

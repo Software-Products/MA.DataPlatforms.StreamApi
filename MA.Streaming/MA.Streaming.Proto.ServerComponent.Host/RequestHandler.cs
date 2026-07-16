@@ -18,19 +18,14 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 
-using MA.Streaming.Core;
 using MA.Streaming.Core.Configs;
-using MA.Streaming.Core.Routing;
 
 namespace MA.Streaming.Proto.ServerComponent.Host;
 
 [ExcludeFromCodeCoverage]
 internal static class RequestHandler
 {
-    private static bool started;
-    private static readonly object HandleRequestLock = new();
 
     public static Task Handle(
         HttpListenerContext context,
@@ -70,32 +65,23 @@ internal static class RequestHandler
     {
         try
         {
-            lock (HandleRequestLock)
+            if (ServerStarter.IsStarted)
             {
-                if (started)
-                {
-                    response.OutputStream.Write(Encoding.UTF8.GetBytes("stream api server has been started..."));
-                    response.Close();
-                    return;
-                }
-
-                var config = JsonSerializer.Deserialize<StreamingApiConfiguration>(
-                    File.ReadAllText(Environment.CurrentDirectory + AppDefinition.StreamApiConfigFilePath));
-
-                if (config == null)
-                {
-                    LogExceptionAndReturnInternalServerError("invalid config file. app will exit", response);
-                    return;
-                }
-
-                var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
-                var server = new Server(config, cancellationTokenSourceProvider, new KafkaBrokerAvailabilityChecker(), new LoggingDirectoryProvider(""));
-                _ = Task.Run(async () => await server.Start(), cancellationTokenSourceProvider.Provide().Token);
-
-                Console.WriteLine($"Stream Api Server Started on port {config.StreamApiPort}...");
-                SendSuccessMessage(response, config);
-                started = true;
+                response.OutputStream.Write("stream api server has been started..."u8);
+                response.Close();
+                return;
             }
+
+            var config = ServerStarter.Start();
+
+            if (config == null)
+            {
+                LogExceptionAndReturnInternalServerError("invalid config file. app will exit", response);
+                return;
+            }
+         
+            SendSuccessMessage(response, config);
+
         }
         catch (Exception ex)
         {

@@ -30,18 +30,21 @@ namespace MA.Streaming.Proto.ServerComponent.Host;
 [ExcludeFromCodeCoverage] // This class is responsible for starting the Stream API server. It ensures that the server is only started once and handles the configuration and logging setup.
 internal static class ServerStarter
 {
-    private static bool started;
     private static readonly object HandleRequestLock = new();
 
-    public static void Start()
+    private static StreamingApiConfiguration? startedConfiguration;
+
+    public static bool IsStarted { get; private set; }
+
+    public static StreamingApiConfiguration? Start()
     {
         try
         {
             lock (HandleRequestLock)
             {
-                if (started)
+                if (IsStarted)
                 {
-                    return;
+                    return startedConfiguration;
                 }
 
                 var configuration = new ConfigurationBuilder()
@@ -68,9 +71,11 @@ internal static class ServerStarter
                 if (hostConfig == null)
                 {
                     Console.WriteLine("invalid config file. app will exit");
-                    return;
+                    return null;
                 }
 
+                // Security section is resolved from IConfiguration — environment variables
+                // (StreamApiConfig__Security__*) are layered on top of AppConfig.json.
                 var streamApiConfig = new StreamingApiConfiguration(
                     hostConfig.StreamCreationStrategy,
                     hostConfig.BrokerUrl,
@@ -86,17 +91,26 @@ internal static class ServerStarter
                     hostConfig.Domain,
                     hostConfig.BatchingSizesKb,
                     hostConfig.BatchingTimeMs,
-                    hostConfig.EnableGrpcReflection);
+                    hostConfig.EnableGrpcReflection,
+                    hostConfig.KafkaBrokerPublishingConfigFilePath,
+                    hostConfig.KafkaBrokerConsumingConfigFilePath,
+                    hostConfig.KafkaBrokerConfigWhitelistFilePath,
+                    hostConfig.Security,
+                    hostConfig.EnableRouterPublishMetrics,
+                    hostConfig.EnableRouterConsumeMetrics);
+
+                var securityConfigProvider = new ConfigurationBasedKafkaSecurityConfigProvider(streamApiConfig);
 
                 var cancellationTokenSourceProvider = new CancellationTokenSourceProvider();
                 var server = new Server(
                     streamApiConfig,
                     cancellationTokenSourceProvider,
-                    new KafkaBrokerAvailabilityChecker(),
+                    new KafkaBrokerAvailabilityChecker(securityConfigProvider),
                     new LoggingDirectoryProvider(""),
                     logger: logger,
                     grpcMaxReceiveMessageSize: grpConfiguration?.MaxReceiveMessageSize,
-                    grpcMaxSendMessageSize: grpConfiguration?.MaxReceiveMessageSize);
+                    grpcMaxSendMessageSize: grpConfiguration?.MaxReceiveMessageSize,
+                    kafkaSecurityConfigProvider: securityConfigProvider);
 
                 _ = Task.Run(
                     async () =>
@@ -114,7 +128,9 @@ internal static class ServerStarter
                     cancellationTokenSourceProvider.Provide().Token);
 
                 Console.WriteLine($"Stream Api Server Started on port {streamApiConfig.StreamApiPort}...");
-                started = true;
+                startedConfiguration = streamApiConfig;
+                IsStarted = true;
+                return streamApiConfig;
             }
         }
         catch (Exception ex)
